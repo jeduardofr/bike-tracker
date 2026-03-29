@@ -20,22 +20,28 @@ fun TrackingScreen(
     viewModel: TrackingViewModel = hiltViewModel()
 ) {
     val trackingState by viewModel.trackingState.collectAsState()
+    val currentLocation by viewModel.currentLocation.collectAsState()
 
-    val state = trackingState
-    if (state is TrackingState.Idle) {
-        onStop()
-        return
+    // Only pop back when transitioning Tracking → Idle (trip ended),
+    // not on initial composition where the service may not have started yet.
+    var hasBeenTracking by remember { mutableStateOf(false) }
+    LaunchedEffect(trackingState) {
+        if (trackingState is TrackingState.Tracking) hasBeenTracking = true
+        if (hasBeenTracking && trackingState is TrackingState.Idle) onStop()
     }
 
-    val trackingData = state as? TrackingState.Tracking
+    val trackingData = trackingState as? TrackingState.Tracking
 
-    val cameraPositionState = rememberCameraPositionState {
-        if (trackingData?.points?.isNotEmpty() == true) {
-            val last = trackingData.points.last()
-            position = CameraPosition.fromLatLngZoom(LatLng(last.latitude, last.longitude), 16f)
+    val cameraPositionState = rememberCameraPositionState()
+
+    // Center on current location as soon as we have it (before any GPS points arrive)
+    LaunchedEffect(currentLocation) {
+        currentLocation?.let {
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(it, 16f)
         }
     }
 
+    // Follow the latest GPS point as the route is recorded
     LaunchedEffect(trackingData?.points?.lastOrNull()) {
         trackingData?.points?.lastOrNull()?.let {
             cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
@@ -45,7 +51,9 @@ fun TrackingScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(isMyLocationEnabled = true),
+            uiSettings = MapUiSettings(myLocationButtonEnabled = true)
         ) {
             trackingData?.points?.let { points ->
                 if (points.size >= 2) {
@@ -59,26 +67,32 @@ fun TrackingScreen(
         }
 
         // Stats overlay
-        trackingData?.let { data ->
-            Card(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (trackingData != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatCard("Distance", "%.1f".format(data.distanceMeters / 1000f), "km", Modifier.weight(1f))
-                        StatCard("Speed", "%.1f".format(data.currentSpeedKmh), "km/h", Modifier.weight(1f))
-                        StatCard("Time", formatElapsed(data.elapsedSeconds), "", Modifier.weight(1f))
+                        StatCard("Distance", "%.1f".format(trackingData.distanceMeters / 1000f), "km", Modifier.weight(1f))
+                        StatCard("Speed", "%.1f".format(trackingData.currentSpeedKmh), "km/h", Modifier.weight(1f))
+                        StatCard("Time", formatElapsed(trackingData.elapsedSeconds), "", Modifier.weight(1f))
                     }
-                    Button(
-                        onClick = onStop,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Stop Trip")
-                    }
+                } else {
+                    Text(
+                        "Waiting for GPS…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Button(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Stop Trip")
                 }
             }
         }

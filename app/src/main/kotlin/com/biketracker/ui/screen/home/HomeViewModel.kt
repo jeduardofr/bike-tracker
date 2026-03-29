@@ -2,6 +2,7 @@ package com.biketracker.ui.screen.home
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.biketracker.data.local.database.entity.TripDirection
@@ -37,14 +38,23 @@ class HomeViewModel @Inject constructor(
     fun startTrip(direction: TripDirection) {
         viewModelScope.launch {
             val result = startTripUseCase(direction)
-            result.onSuccess { tripId ->
-                val intent = Intent(context, TrackingService::class.java).apply {
-                    action = TrackingService.ACTION_START
-                    putExtra(TrackingService.EXTRA_TRIP_ID, tripId)
+            result
+                .onSuccess { tripId ->
+                    Log.d(TAG, "Trip started id=$tripId, launching service")
+                    val intent = Intent(context, TrackingService::class.java).apply {
+                        action = TrackingService.ACTION_START
+                        putExtra(TrackingService.EXTRA_TRIP_ID, tripId)
+                    }
+                    context.startForegroundService(intent)
                 }
-                context.startForegroundService(intent)
-            }
+                .onFailure { e ->
+                    Log.e(TAG, "startTripUseCase failed", e)
+                }
         }
+    }
+
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 
     fun stopTrip() {

@@ -9,9 +9,10 @@ class StartTripUseCase @Inject constructor(
     private val tripRepository: TripRepository
 ) {
     suspend operator fun invoke(direction: TripDirection): Result<Long> {
+        // Abandon any stuck incomplete trip from a previous crashed/interrupted session
         val activeTrip = tripRepository.getActiveTrip().firstOrNull()
         if (activeTrip != null) {
-            return Result.failure(IllegalStateException("A trip is already in progress"))
+            tripRepository.stopTrip(activeTrip.id, 0f, 0f)
         }
         return Result.success(tripRepository.startTrip(direction))
     }
