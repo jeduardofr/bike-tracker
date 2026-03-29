@@ -60,7 +60,7 @@ fun LocationPickerScreen(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(12.dp),
+                .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             OutlinedTextField(
