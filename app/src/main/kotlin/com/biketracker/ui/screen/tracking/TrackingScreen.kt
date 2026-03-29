@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.biketracker.service.TrackingState
 import com.biketracker.ui.component.StatCard
+import com.biketracker.ui.theme.StopRed
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -91,7 +92,7 @@ fun TrackingScreen(
                 Button(
                     onClick = { viewModel.stopTrip() },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = StopRed, contentColor = Color.White)
                 ) {
                     Text("Stop Trip")
                 }

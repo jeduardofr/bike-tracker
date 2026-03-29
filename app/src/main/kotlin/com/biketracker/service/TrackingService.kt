@@ -113,11 +113,11 @@ class TrackingService : Service() {
 
     private fun stopTracking() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
+        trackingStateHolder.emit(TrackingState.Idle)
         serviceScope.launch {
             if (currentTripId != -1L) {
                 stopTripUseCase(currentTripId)
             }
-            trackingStateHolder.emit(TrackingState.Idle)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

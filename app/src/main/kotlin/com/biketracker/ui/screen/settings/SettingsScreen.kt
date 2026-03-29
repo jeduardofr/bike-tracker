@@ -25,7 +25,7 @@ fun SettingsScreen(
     var newItem by remember { mutableStateOf("") }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().statusBarsPadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Text("Settings", style = MaterialTheme.typography.headlineMedium) }

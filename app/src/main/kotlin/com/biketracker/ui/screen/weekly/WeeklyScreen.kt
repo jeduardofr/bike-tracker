@@ -18,7 +18,7 @@ import com.google.maps.android.compose.*
 fun WeeklyScreen(viewModel: WeeklyViewModel = hiltViewModel()) {
     val stats by viewModel.weeklyStats.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         Text(
             "This Week",
             style = MaterialTheme.typography.headlineMedium,

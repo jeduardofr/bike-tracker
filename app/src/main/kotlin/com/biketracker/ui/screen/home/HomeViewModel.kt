@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.biketracker.data.local.database.entity.TripDirection
+import com.biketracker.domain.repository.TripRepository
 import com.biketracker.domain.usecase.GetDailyStatsUseCase
 import com.biketracker.domain.usecase.StartTripUseCase
 import com.biketracker.service.AppNotificationManager
@@ -15,16 +16,20 @@ import com.biketracker.service.TrackingStateHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class AllTimeStats(val totalDistanceKm: Float, val totalTrips: Int)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val startTripUseCase: StartTripUseCase,
     private val trackingStateHolder: TrackingStateHolder,
-    private val getDailyStats: GetDailyStatsUseCase
+    private val getDailyStats: GetDailyStatsUseCase,
+    private val tripRepository: TripRepository
 ) : ViewModel() {
 
     val trackingState = trackingStateHolder.state.stateIn(
@@ -34,6 +39,15 @@ class HomeViewModel @Inject constructor(
     val dailyStats = getDailyStats().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), null
     )
+
+    val allTimeStats = tripRepository.getAllTrips()
+        .map { trips ->
+            AllTimeStats(
+                totalDistanceKm = trips.sumOf { it.distanceMeters.toDouble() }.toFloat() / 1000f,
+                totalTrips = trips.size
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun startTrip(direction: TripDirection) {
         viewModelScope.launch {
@@ -53,14 +67,14 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    companion object {
-        private const val TAG = "HomeViewModel"
-    }
-
     fun stopTrip() {
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_STOP
         }
         context.startService(intent)
+    }
+
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 }

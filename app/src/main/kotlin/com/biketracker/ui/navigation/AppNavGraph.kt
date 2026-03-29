@@ -31,7 +31,21 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
     NavHost(navController = navController, startDestination = Routes.HOME, modifier = modifier) {
         composable(Routes.HOME) {
             HomeScreen(
-                onStartTracking = { navController.navigate(Routes.TRACKING) }
+                onStartTracking = { navController.navigate(Routes.TRACKING) },
+                onGoToHistory = {
+                    navController.navigate(Routes.HISTORY) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onGoToWeekly = {
+                    navController.navigate(Routes.WEEKLY) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
             )
         }
         composable(Routes.TRACKING) {

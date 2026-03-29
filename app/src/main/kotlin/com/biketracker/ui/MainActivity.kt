@@ -5,6 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.graphics.Color
+import com.biketracker.ui.theme.BikeGreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
@@ -66,13 +69,20 @@ private fun BikeTrackerApp() {
                                 }
                             },
                             icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) }
+                            label = { Text(item.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = BikeGreen.copy(alpha = 0.2f),
+                                selectedIconColor = BikeGreen,
+                                selectedTextColor = BikeGreen,
+                                unselectedIconColor = Color.Gray,
+                                unselectedTextColor = Color.Gray
+                            )
                         )
                     }
                 }
             }
         }
     ) { padding ->
-        AppNavGraph(navController = navController, modifier = Modifier.padding(padding))
+        AppNavGraph(navController = navController, modifier = Modifier.padding(bottom = padding.calculateBottomPadding()))
     }
 }

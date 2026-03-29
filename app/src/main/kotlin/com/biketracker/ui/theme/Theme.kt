@@ -2,34 +2,27 @@ package com.biketracker.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val LightColors = lightColorScheme(
+private val DarkColors = darkColorScheme(
     primary = BikeGreen,
     onPrimary = Color.White,
-    primaryContainer = BikeGreenLight,
+    primaryContainer = BikeGreenDark,
+    onPrimaryContainer = BikeGreenLight,
     secondary = BikeOrange,
-    background = SurfaceLight,
-    surface = Color.White,
-    onBackground = OnSurface,
-    onSurface = OnSurface
-)
-
-private val DarkColors = darkColorScheme(
-    primary = BikeGreenLight,
-    onPrimary = Color.Black,
-    secondary = BikeOrange
+    background = BackgroundBlack,
+    onBackground = Color.White,
+    surface = SurfaceDark,
+    onSurface = Color.White,
+    surfaceVariant = SurfaceDarker,
+    onSurfaceVariant = OnSurfaceMuted
 )
 
 @Composable
-fun BikeTrackerTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit
-) {
+fun BikeTrackerTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = DarkColors,
         content = content
     )
 }

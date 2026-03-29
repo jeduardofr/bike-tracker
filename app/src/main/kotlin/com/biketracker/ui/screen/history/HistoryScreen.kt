@@ -22,7 +22,7 @@ fun HistoryScreen(
 ) {
     val trips by viewModel.trips.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         Text(
             "History",
             style = MaterialTheme.typography.headlineMedium,
