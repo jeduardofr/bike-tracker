@@ -8,7 +8,7 @@ Usage:
 Defaults:
     input   : route.kml
     output  : route_emulator.gpx
-    speed   : 15 km/h  (typical bike commute)
+    speed   : 21.6 km/h  (~6 m/s)
     start   : 2026-03-30T08:00:00Z
 """
 
@@ -92,7 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description="Google Earth KML → GPX for Android Emulator")
     parser.add_argument("input",  nargs="?", default="route.kml")
     parser.add_argument("output", nargs="?", default="route_emulator.gpx")
-    parser.add_argument("--speed", type=float, default=15.0, help="Average speed in km/h (default: 15)")
+    parser.add_argument("--speed", type=float, default=21.6, help="Average speed in km/h (default: 21.6 — ~6 m/s)")
     parser.add_argument("--start", default="2026-03-30T08:00:00Z", help="Start datetime ISO 8601 UTC")
     args = parser.parse_args()
 

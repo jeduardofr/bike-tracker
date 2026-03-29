@@ -88,7 +88,7 @@ fun TrackingScreen(
                     )
                 }
                 Button(
-                    onClick = onStop,
+                    onClick = { viewModel.stopTrip() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
