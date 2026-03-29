@@ -6,13 +6,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.biketracker.R
 import com.biketracker.service.TrackingState
 import com.biketracker.ui.component.StatCard
 import com.biketracker.ui.theme.StopRed
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 
 @Composable
@@ -50,10 +53,11 @@ fun TrackingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val darkStyle = MapStyleOptions.loadRawResourceStyle(LocalContext.current, R.raw.map_style_dark)
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = MapProperties(isMyLocationEnabled = true),
+            properties = MapProperties(isMyLocationEnabled = true, mapStyleOptions = darkStyle),
             uiSettings = MapUiSettings(myLocationButtonEnabled = true)
         ) {
             trackingData?.points?.let { points ->

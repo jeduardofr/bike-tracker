@@ -7,11 +7,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.biketracker.R
 import com.biketracker.ui.component.StatCard
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,11 +51,13 @@ fun TripDetailScreen(
             }
 
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+                val darkStyle = MapStyleOptions.loadRawResourceStyle(LocalContext.current, R.raw.map_style_dark)
                 GoogleMap(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp),
-                    cameraPositionState = cameraPositionState
+                    cameraPositionState = cameraPositionState,
+                    properties = MapProperties(mapStyleOptions = darkStyle)
                 ) {
                     if (points.size >= 2) {
                         Polyline(points = points, color = Color(0xFF2E7D32), width = 8f)
