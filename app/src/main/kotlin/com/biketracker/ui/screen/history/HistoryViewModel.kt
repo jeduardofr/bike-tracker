@@ -7,12 +7,19 @@ import com.biketracker.domain.repository.TripRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class HistoryViewModel @Inject constructor(tripRepository: TripRepository) : ViewModel() {
+class HistoryViewModel @Inject constructor(
+    private val tripRepository: TripRepository
+) : ViewModel() {
 
     val trips = tripRepository.getAllTrips().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<Trip>()
     )
+
+    fun deleteTrip(tripId: Long) {
+        viewModelScope.launch { tripRepository.deleteTrip(tripId) }
+    }
 }
