@@ -13,6 +13,9 @@ import com.biketracker.ui.component.StatCard
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,13 +59,31 @@ fun TripDetailScreen(
                     }
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val durationMin = t.endTime?.let { ((it - t.startTime) / 60_000).toInt() } ?: 0
                     StatCard("Distance", "%.1f".format(t.distanceMeters / 1000f), "km", Modifier.weight(1f))
                     StatCard("Duration", durationMin.toString(), "min", Modifier.weight(1f))
                     StatCard("Avg Speed", "%.1f".format(t.averageSpeedKmh), "km/h", Modifier.weight(1f))
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val dateFmt = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatCard("Date", dateFmt.format(Date(t.startTime)), "", Modifier.weight(1f))
+                    StatCard("Departed", timeFmt.format(Date(t.startTime)), "", Modifier.weight(1f))
+                    StatCard(
+                        "Arrived",
+                        t.endTime?.let { timeFmt.format(Date(it)) } ?: "—",
+                        "",
+                        Modifier.weight(1f)
+                    )
                 }
             }
         } ?: Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
