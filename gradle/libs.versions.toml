@@ -1,0 +1,76 @@
+[versions]
+agp                     = "8.7.3"
+kotlin                  = "2.0.21"
+ksp                     = "2.0.21-1.0.27"
+composeBom              = "2024.09.03"
+hilt                    = "2.52"
+room                    = "2.6.1"
+navigationCompose       = "2.8.3"
+lifecycle               = "2.8.6"
+mapsCompose             = "4.4.1"
+playServicesMap         = "19.0.0"
+playServicesLocation    = "21.3.0"
+workRuntime             = "2.9.1"
+datastore               = "1.1.1"
+coroutines              = "1.9.0"
+accompanistPermissions  = "0.36.0"
+activityCompose         = "1.9.2"
+hiltNavigationCompose   = "1.2.0"
+hiltWork                = "1.2.0"
+coreKtx                 = "1.13.1"
+appcompat               = "1.7.0"
+
+[libraries]
+# Compose BOM
+compose-bom                  = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-ui                   = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-tooling           = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-tooling-preview   = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-material3            = { group = "androidx.compose.material3", name = "material3" }
+compose-activity             = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+compose-viewmodel            = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+compose-lifecycle-runtime    = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+
+# Navigation
+navigation-compose           = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+
+# Hilt
+hilt-android                 = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler                = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose      = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+hilt-work                    = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltWork" }
+hilt-work-compiler           = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "hiltWork" }
+
+# Room
+room-runtime                 = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-compiler                = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-ktx                     = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+
+# Location & Maps
+play-services-location       = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-maps           = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMap" }
+maps-compose                 = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
+
+# WorkManager
+work-runtime-ktx             = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntime" }
+
+# DataStore
+datastore-preferences        = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Coroutines
+coroutines-android           = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+coroutines-play-services     = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
+
+# Accompanist
+accompanist-permissions      = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+
+# Core
+core-ktx                     = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+appcompat                    = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+
+[plugins]
+android-application          = { id = "com.android.application", version.ref = "agp" }
+kotlin-android               = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose               = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+hilt                         = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp                          = { id = "com.google.devtools.ksp", version.ref = "ksp" }

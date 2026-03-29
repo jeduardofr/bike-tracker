@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bike Tracker</string>
+    <string name="notification_channel_tracking">Route Tracking</string>
+    <string name="notification_channel_geofence">Location Alerts</string>
+    <string name="notification_channel_work_timer">Work Timer</string>
+    <string name="notification_tracking_title">Tracking route…</string>
+    <string name="notification_packing_title">Time to leave!</string>
+    <string name="notification_packing_text">Remember to pack everything before heading out.</string>
+    <string name="notification_work_done_title">Time to head home!</string>
+    <string name="notification_work_done_text">You\'ve been at work for 8 hours.</string>
+    <string name="notification_start_home_trip_title">Back home?</string>
+    <string name="notification_start_home_trip_text">Tap to start tracking your ride home.</string>
+    <string name="home_geofence_id">GEOFENCE_HOME</string>
+    <string name="office_geofence_id">GEOFENCE_OFFICE</string>
+</resources>
