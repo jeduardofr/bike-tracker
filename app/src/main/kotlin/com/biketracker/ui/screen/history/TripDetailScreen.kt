@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.biketracker.R
 import com.biketracker.ui.component.StatCard
+import com.biketracker.ui.util.buildSegments
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -43,10 +44,12 @@ fun TripDetailScreen(
         }
     ) { padding ->
         trip?.let { t ->
-            val points = t.routePoints.map { LatLng(it.latitude, it.longitude) }
+            val routePoints = t.routePoints
             val cameraPositionState = rememberCameraPositionState {
-                if (points.isNotEmpty()) {
-                    position = CameraPosition.fromLatLngZoom(points.first(), 14f)
+                if (routePoints.isNotEmpty()) {
+                    position = CameraPosition.fromLatLngZoom(
+                        LatLng(routePoints.first().latitude, routePoints.first().longitude), 14f
+                    )
                 }
             }
 
@@ -59,10 +62,32 @@ fun TripDetailScreen(
                     cameraPositionState = cameraPositionState,
                     properties = MapProperties(mapStyleOptions = darkStyle)
                 ) {
-                    if (points.size >= 2) {
-                        Polyline(points = points, color = Color(0xFF2E7D32), width = 8f)
+                    if (routePoints.size >= 2) {
+                        val segments = buildSegments(routePoints)
+                        segments.forEach { segment ->
+                            Polyline(
+                                points = segment.points.map { LatLng(it.latitude, it.longitude) },
+                                color = if (segment.isRiding) Color(0xFF2E7D32) else Color(0xFF7B1FA2),
+                                width = 8f
+                            )
+                        }
+                    }
+
+                    // GPS sample dots at high zoom
+                    val zoom = cameraPositionState.position.zoom
+                    if (zoom > 15f && routePoints.isNotEmpty()) {
+                        routePoints.forEach { point ->
+                            Circle(
+                                center = LatLng(point.latitude, point.longitude),
+                                radius = 3.0,
+                                fillColor = Color.White.copy(alpha = 0.7f),
+                                strokeColor = Color.White,
+                                strokeWidth = 1f
+                            )
+                        }
                     }
                 }
+
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

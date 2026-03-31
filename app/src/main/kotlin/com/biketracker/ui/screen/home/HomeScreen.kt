@@ -41,6 +41,7 @@ fun HomeScreen(
     } else null
 
     var pendingDirection by remember { mutableStateOf<TripDirection?>(null) }
+    var showStopDialog by remember { mutableStateOf(false) }
 
     val readyToTrack = locationPermission.status.isGranted &&
             (notificationPermission == null || notificationPermission.status.isGranted)
@@ -101,7 +102,7 @@ fun HomeScreen(
                             StatCard("Time", formatSeconds(state.elapsedSeconds), "")
                         }
                         Button(
-                            onClick = { viewModel.stopTrip() },
+                            onClick = { showStopDialog = true },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = StopRed, contentColor = Color.White)
                         ) {
@@ -187,6 +188,23 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    if (showStopDialog) {
+        AlertDialog(
+            onDismissRequest = { showStopDialog = false },
+            title = { Text("Stop trip?") },
+            text = { Text("Are you sure you want to end this trip?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.stopTrip()
+                    showStopDialog = false
+                }) { Text("Stop") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

@@ -68,7 +68,7 @@ fun SettingsScreen(
                     Slider(
                         value = geofenceRadius,
                         onValueChange = { viewModel.setGeofenceRadius(it) },
-                        valueRange = 50f..500f,
+                        valueRange = 10f..100f,
                         steps = 8
                     )
                 }

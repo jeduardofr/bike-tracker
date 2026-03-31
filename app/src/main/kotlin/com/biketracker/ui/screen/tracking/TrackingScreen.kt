@@ -1,6 +1,8 @@
 package com.biketracker.ui.screen.tracking
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,8 +28,6 @@ fun TrackingScreen(
     val trackingState by viewModel.trackingState.collectAsState()
     val currentLocation by viewModel.currentLocation.collectAsState()
 
-    // Only pop back when transitioning Tracking → Idle (trip ended),
-    // not on initial composition where the service may not have started yet.
     var hasBeenTracking by remember { mutableStateOf(false) }
     LaunchedEffect(trackingState) {
         if (trackingState is TrackingState.Tracking) hasBeenTracking = true
@@ -37,18 +37,33 @@ fun TrackingScreen(
     val trackingData = trackingState as? TrackingState.Tracking
 
     val cameraPositionState = rememberCameraPositionState()
+    var isFollowing by remember { mutableStateOf(true) }
+    var showStopDialog by remember { mutableStateOf(false) }
 
-    // Center on current location as soon as we have it (before any GPS points arrive)
-    LaunchedEffect(currentLocation) {
-        currentLocation?.let {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(it, 16f)
+    // Detect user gesture panning
+    LaunchedEffect(cameraPositionState.isMoving, cameraPositionState.cameraMoveStartedReason) {
+        if (cameraPositionState.isMoving &&
+            cameraPositionState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE
+        ) {
+            isFollowing = false
         }
     }
 
-    // Follow the latest GPS point as the route is recorded
-    LaunchedEffect(trackingData?.points?.lastOrNull()) {
-        trackingData?.points?.lastOrNull()?.let {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+    // Center on current location initially
+    LaunchedEffect(currentLocation) {
+        if (isFollowing) {
+            currentLocation?.let {
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(it, 16f)
+            }
+        }
+    }
+
+    // Follow latest GPS point only when isFollowing
+    LaunchedEffect(trackingData?.points?.lastOrNull(), isFollowing) {
+        if (isFollowing) {
+            trackingData?.points?.lastOrNull()?.let {
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+            }
         }
     }
 
@@ -58,7 +73,7 @@ fun TrackingScreen(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(isMyLocationEnabled = true, mapStyleOptions = darkStyle),
-            uiSettings = MapUiSettings(myLocationButtonEnabled = true)
+            uiSettings = MapUiSettings(myLocationButtonEnabled = false)
         ) {
             trackingData?.points?.let { points ->
                 if (points.size >= 2) {
@@ -68,6 +83,25 @@ fun TrackingScreen(
                         width = 8f
                     )
                 }
+            }
+        }
+
+        // Re-center FAB
+        if (!isFollowing) {
+            FloatingActionButton(
+                onClick = {
+                    isFollowing = true
+                    trackingData?.points?.lastOrNull()?.let {
+                        cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(16.dp),
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = "Re-center", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -94,7 +128,7 @@ fun TrackingScreen(
                     )
                 }
                 Button(
-                    onClick = { viewModel.stopTrip() },
+                    onClick = { showStopDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = StopRed, contentColor = Color.White)
                 ) {
@@ -102,6 +136,23 @@ fun TrackingScreen(
                 }
             }
         }
+    }
+
+    if (showStopDialog) {
+        AlertDialog(
+            onDismissRequest = { showStopDialog = false },
+            title = { Text("Stop trip?") },
+            text = { Text("Are you sure you want to end this trip?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.stopTrip()
+                    showStopDialog = false
+                }) { Text("Stop") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

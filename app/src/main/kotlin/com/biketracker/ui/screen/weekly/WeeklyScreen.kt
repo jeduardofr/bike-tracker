@@ -42,11 +42,18 @@ fun WeeklyScreen(viewModel: WeeklyViewModel = hiltViewModel()) {
             cameraPositionState = cameraPositionState,
             properties = MapProperties(mapStyleOptions = darkStyle)
         ) {
-            val colors = listOf(Color.Blue, Color.Red, Color.Green, Color.Magenta, Color.Cyan, Color.Yellow, Color(0xFFFF6600))
-            stats?.days?.forEachIndexed { idx, day ->
+            stats?.days?.forEach { day ->
                 day.trips.forEach { trip ->
-                    val pts = trip.routePoints.map { LatLng(it.latitude, it.longitude) }
-                    if (pts.size >= 2) Polyline(points = pts, color = colors[idx % colors.size], width = 6f)
+                    if (trip.routePoints.size >= 2) {
+                        val segments = com.biketracker.ui.util.buildSegments(trip.routePoints)
+                        segments.forEach { segment ->
+                            Polyline(
+                                points = segment.points.map { LatLng(it.latitude, it.longitude) },
+                                color = if (segment.isRiding) Color(0xFF2E7D32) else Color(0xFF7B1FA2),
+                                width = 6f
+                            )
+                        }
+                    }
                 }
             }
         }

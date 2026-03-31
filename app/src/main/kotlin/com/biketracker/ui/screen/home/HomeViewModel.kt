@@ -58,6 +58,7 @@ class HomeViewModel @Inject constructor(
                     val intent = Intent(context, TrackingService::class.java).apply {
                         action = TrackingService.ACTION_START
                         putExtra(TrackingService.EXTRA_TRIP_ID, tripId)
+                        putExtra(TrackingService.EXTRA_DIRECTION, direction.name)
                     }
                     context.startForegroundService(intent)
                 }

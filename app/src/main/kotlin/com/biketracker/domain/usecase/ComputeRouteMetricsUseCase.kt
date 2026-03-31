@@ -8,15 +8,23 @@ data class RouteMetrics(val distanceMeters: Float, val averageSpeedKmh: Float)
 
 class ComputeRouteMetricsUseCase @Inject constructor() {
 
+    companion object {
+        private const val MAX_ACCURACY_M = 50f
+    }
+
     operator fun invoke(points: List<RoutePoint>): RouteMetrics {
         if (points.size < 2) return RouteMetrics(0f, 0f)
 
+        // Filter out inaccurate points first
+        val filtered = points.filter { it.accuracy <= MAX_ACCURACY_M || it.accuracy == 0f }
+        if (filtered.size < 2) return RouteMetrics(0f, 0f)
+
         var totalDistance = 0f
-        for (i in 1 until points.size) {
-            totalDistance += haversineMeters(points[i - 1], points[i])
+        for (i in 1 until filtered.size) {
+            totalDistance += haversineMeters(filtered[i - 1], filtered[i])
         }
 
-        val durationSeconds = (points.last().timestamp - points.first().timestamp) / 1000.0
+        val durationSeconds = (filtered.last().timestamp - filtered.first().timestamp) / 1000.0
         val avgSpeedKmh = if (durationSeconds > 0) {
             ((totalDistance / durationSeconds) * 3.6).toFloat()
         } else 0f
