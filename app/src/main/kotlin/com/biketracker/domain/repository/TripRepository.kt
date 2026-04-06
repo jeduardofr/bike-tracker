@@ -13,5 +13,6 @@ interface TripRepository {
     fun getTripsInRange(from: Long, to: Long): Flow<List<Trip>>
     suspend fun getTripWithRoute(tripId: Long): Trip?
     fun getAllTrips(): Flow<List<Trip>>
+    suspend fun getTripsWithRoutesInRange(from: Long, to: Long): List<Trip>
     suspend fun deleteTrip(tripId: Long)
 }

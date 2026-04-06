@@ -58,6 +58,14 @@ class TripRepositoryImpl @Inject constructor(
     override fun getAllTrips(): Flow<List<Trip>> =
         tripDao.getAllTrips().map { list -> list.map { it.toDomain() } }
 
+    override suspend fun getTripsWithRoutesInRange(from: Long, to: Long): List<Trip> {
+        val trips = tripDao.getTripsInRangeOnce(from, to)
+        return trips.map { trip ->
+            val points = routePointDao.getPointsForTripOnce(trip.id)
+            trip.toDomain(points.map { it.toDomain() })
+        }
+    }
+
     override suspend fun deleteTrip(tripId: Long) = tripDao.deleteTrip(tripId)
 
     private fun TripEntity.toDomain(points: List<RoutePoint> = emptyList()) = Trip(

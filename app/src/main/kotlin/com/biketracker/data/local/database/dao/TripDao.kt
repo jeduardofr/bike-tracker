@@ -25,6 +25,9 @@ interface TripDao {
     @Query("SELECT * FROM trips ORDER BY startTime DESC")
     fun getAllTrips(): Flow<List<TripEntity>>
 
+    @Query("SELECT * FROM trips WHERE startTime >= :from AND startTime < :to AND isCompleted = 1 ORDER BY startTime DESC")
+    suspend fun getTripsInRangeOnce(from: Long, to: Long): List<TripEntity>
+
     @Query("DELETE FROM trips WHERE id = :id")
     suspend fun deleteTrip(id: Long)
 }

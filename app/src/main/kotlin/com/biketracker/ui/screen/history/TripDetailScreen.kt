@@ -73,10 +73,11 @@ fun TripDetailScreen(
                         }
                     }
 
-                    // GPS sample dots at high zoom
+                    // GPS sample dots at high zoom — sampled to max ~60 points
                     val zoom = cameraPositionState.position.zoom
                     if (zoom > 15f && routePoints.isNotEmpty()) {
-                        routePoints.forEach { point ->
+                        val step = maxOf(1, routePoints.size / 60)
+                        routePoints.filterIndexed { i, _ -> i % step == 0 }.forEach { point ->
                             Circle(
                                 center = LatLng(point.latitude, point.longitude),
                                 radius = 3.0,
