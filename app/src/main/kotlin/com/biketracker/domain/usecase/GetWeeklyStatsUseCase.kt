@@ -3,8 +3,10 @@ package com.biketracker.domain.usecase
 import com.biketracker.domain.model.DailyStats
 import com.biketracker.domain.model.WeeklyStats
 import com.biketracker.domain.repository.TripRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -43,5 +45,5 @@ class GetWeeklyStatsUseCase @Inject constructor(
                 totalTrips = allTrips.size
             )
         )
-    }
+    }.flowOn(Dispatchers.IO)
 }

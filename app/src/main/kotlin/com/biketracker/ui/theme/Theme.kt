@@ -23,6 +23,7 @@ private val DarkColors = darkColorScheme(
 fun BikeTrackerTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkColors,
+        typography = Typography,
         content = content
     )
 }

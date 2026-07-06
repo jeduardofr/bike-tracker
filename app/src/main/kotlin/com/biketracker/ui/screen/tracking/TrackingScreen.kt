@@ -79,7 +79,7 @@ fun TrackingScreen(
                 if (points.size >= 2) {
                     Polyline(
                         points = points.map { LatLng(it.latitude, it.longitude) },
-                        color = Color(0xFF2E7D32),
+                        color = com.biketracker.ui.theme.BikeGreen,
                         width = 8f
                     )
                 }

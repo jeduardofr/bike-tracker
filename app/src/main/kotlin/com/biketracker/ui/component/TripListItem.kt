@@ -1,15 +1,18 @@
 package com.biketracker.ui.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.biketracker.domain.model.Trip
+import com.biketracker.ui.util.accentColor
+import com.biketracker.ui.util.label
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.roundToInt
 
 @Composable
 fun TripListItem(trip: Trip, onClick: () -> Unit) {
@@ -19,7 +22,15 @@ fun TripListItem(trip: Trip, onClick: () -> Unit) {
 
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
-        headlineContent = { Text("${trip.direction.name.replace("_", " → ")}") },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(36.dp)
+                    .background(trip.direction.accentColor(), RoundedCornerShape(2.dp))
+            )
+        },
+        headlineContent = { Text(trip.direction.label()) },
         supportingContent = { Text("$startFormatted · ${durationMin} min · ${"%.1f".format(trip.distanceMeters / 1000f)} km") },
         trailingContent = { Text("${"%.1f".format(trip.averageSpeedKmh)} km/h") }
     )

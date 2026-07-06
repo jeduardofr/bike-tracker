@@ -26,6 +26,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
+        buildConfigField("String", "TURSO_DATABASE_URL", "\"${localProperties.getProperty("TURSO_DATABASE_URL", "")}\"")
+        buildConfigField("String", "TURSO_AUTH_TOKEN", "\"${localProperties.getProperty("TURSO_AUTH_TOKEN", "")}\"")
     }
 
     buildTypes {
@@ -49,6 +51,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

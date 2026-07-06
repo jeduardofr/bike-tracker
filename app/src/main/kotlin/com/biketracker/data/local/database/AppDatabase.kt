@@ -12,7 +12,7 @@ import com.biketracker.data.local.database.entity.WorkSessionEntity
 
 @Database(
     entities = [TripEntity::class, RoutePointEntity::class, WorkSessionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

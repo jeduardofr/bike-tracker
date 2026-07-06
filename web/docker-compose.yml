@@ -1,0 +1,20 @@
+services:
+  web:
+    image: bike-tracker-web:latest
+    restart: unless-stopped
+    env_file: .env
+    # bound to localhost — the HTTPS reverse proxy is the only public entry
+    ports:
+      - "127.0.0.1:8787:8787"
+    mem_limit: 512m
+    cpus: 0.5
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

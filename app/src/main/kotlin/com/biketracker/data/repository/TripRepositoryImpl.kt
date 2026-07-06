@@ -5,6 +5,7 @@ import com.biketracker.data.local.database.dao.TripDao
 import com.biketracker.data.local.database.entity.RoutePointEntity
 import com.biketracker.data.local.database.entity.TripDirection
 import com.biketracker.data.local.database.entity.TripEntity
+import com.biketracker.data.sync.TursoSyncScheduler
 import com.biketracker.domain.model.RoutePoint
 import com.biketracker.domain.model.Trip
 import com.biketracker.domain.repository.TripRepository
@@ -16,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class TripRepositoryImpl @Inject constructor(
     private val tripDao: TripDao,
-    private val routePointDao: RoutePointDao
+    private val routePointDao: RoutePointDao,
+    private val syncScheduler: TursoSyncScheduler
 ) : TripRepository {
 
     override suspend fun startTrip(direction: TripDirection): Long {
@@ -41,6 +43,7 @@ class TripRepositoryImpl @Inject constructor(
                 isCompleted = true
             )
         )
+        syncScheduler.syncNow()
     }
 
     override fun getActiveTrip(): Flow<Trip?> =
@@ -66,7 +69,11 @@ class TripRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun deleteTrip(tripId: Long) = tripDao.deleteTrip(tripId)
+    override suspend fun deleteTrip(tripId: Long) {
+        // capture the uuid before the local row (and its remote identity) is gone
+        tripDao.getTripById(tripId)?.let { syncScheduler.deleteRemoteTrip(it.uuid) }
+        tripDao.deleteTrip(tripId)
+    }
 
     private fun TripEntity.toDomain(points: List<RoutePoint> = emptyList()) = Trip(
         id = id, startTime = startTime, endTime = endTime,

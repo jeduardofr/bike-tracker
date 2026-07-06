@@ -54,3 +54,6 @@ local.properties
 
 # Keys
 google-services.json
+
+# Device DB backups
+backups/

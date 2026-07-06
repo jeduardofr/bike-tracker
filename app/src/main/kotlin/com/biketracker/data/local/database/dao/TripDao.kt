@@ -30,4 +30,10 @@ interface TripDao {
 
     @Query("DELETE FROM trips WHERE id = :id")
     suspend fun deleteTrip(id: Long)
+
+    @Query("SELECT * FROM trips WHERE isCompleted = 1 AND syncedAt IS NULL ORDER BY startTime ASC")
+    suspend fun getUnsyncedTrips(): List<TripEntity>
+
+    @Query("UPDATE trips SET syncedAt = :syncedAt WHERE id = :id")
+    suspend fun markSynced(id: Long, syncedAt: Long)
 }

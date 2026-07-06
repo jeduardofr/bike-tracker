@@ -15,9 +15,15 @@ class BikeTrackerApp : Application(), Configuration.Provider {
     @Inject
     lateinit var appNotificationManager: com.biketracker.service.AppNotificationManager
 
+    @Inject
+    lateinit var tursoSyncScheduler: com.biketracker.data.sync.TursoSyncScheduler
+
     override fun onCreate() {
         super.onCreate()
         appNotificationManager.createNotificationChannels()
+        tursoSyncScheduler.schedulePeriodicSync()
+        // catch up on anything that missed its post-trip sync
+        tursoSyncScheduler.syncNow()
     }
 
     override val workManagerConfiguration: Configuration

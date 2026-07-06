@@ -12,8 +12,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.biketracker.R
 import com.biketracker.ui.component.StatCard
+import com.biketracker.ui.util.accentColor
 import com.biketracker.ui.util.buildSegments
+import com.biketracker.ui.util.label
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.Dash
+import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
@@ -34,7 +38,7 @@ fun TripDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Trip Detail") },
+                title = { Text(trip?.direction?.label() ?: "Trip Detail") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -65,9 +69,11 @@ fun TripDetailScreen(
                     if (routePoints.size >= 2) {
                         val segments = buildSegments(routePoints)
                         segments.forEach { segment ->
+                            // color = direction, dashed = walking (same scheme as Weekly)
                             Polyline(
                                 points = segment.points.map { LatLng(it.latitude, it.longitude) },
-                                color = if (segment.isRiding) Color(0xFF2E7D32) else Color(0xFF7B1FA2),
+                                color = t.direction.accentColor(),
+                                pattern = if (segment.isRiding) null else listOf(Dash(18f), Gap(12f)),
                                 width = 8f
                             )
                         }
