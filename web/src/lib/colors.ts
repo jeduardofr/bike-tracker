@@ -17,6 +17,8 @@ export const WALK_COLOR = "#9575CD";
 // Insights charts: direction series (validated pair)
 export const TO_OFFICE_COLOR = "#43A047";
 export const TO_HOME_COLOR = "#448AFF";
+// University rides: violet + hollow-ring marks (shape carries identity for CVD)
+export const UNIVERSITY_COLOR = "#9575CD";
 
 // Speed-map diverging ramp: slow ↔ median ↔ fast (validated poles + neutral mid)
 export const SLOW_COLOR = "#D9700F";

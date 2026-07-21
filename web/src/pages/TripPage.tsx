@@ -4,7 +4,8 @@ import { api } from "../api";
 import SpeedChart from "../components/SpeedChart";
 import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
-import { RIDE_COLOR, WALK_COLOR, directionLabel } from "../lib/colors";
+import { RIDE_COLOR, WALK_COLOR } from "../lib/colors";
+import { tripLabel } from "../lib/category";
 import { formatDay, formatDuration, formatKm, formatTime } from "../lib/format";
 import { buildSegments, computeMetrics, filterAccurate, haversineMeters } from "../lib/segments";
 import type { RoutePoint, TripResponse } from "../types";
@@ -80,7 +81,7 @@ export default function TripPage() {
               <Link to="/" className="back-link">
                 ← Back
               </Link>
-              <h1>{directionLabel(data.trip.direction)}</h1>
+              <h1>{tripLabel(data.trip)}</h1>
               <div style={{ color: "var(--muted)", fontSize: 14 }}>
                 {formatDay(data.trip.startTime)} · {formatTime(data.trip.startTime)}
                 {data.trip.endTime ? ` – ${formatTime(data.trip.endTime)}` : ""}

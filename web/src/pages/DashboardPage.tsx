@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
-import { directionLabel, weekdayColor } from "../lib/colors";
+import { weekdayColor } from "../lib/colors";
+import { tripLabel } from "../lib/category";
 import { addDays, formatDay, formatDuration, formatKm, formatTime, isoDay, mondayOf } from "../lib/format";
 import { RIDING_THRESHOLD_MPS } from "../lib/segments";
 import type { OverviewResponse, TracePoint, Trip } from "../types";
@@ -127,7 +128,7 @@ export default function DashboardPage() {
                       </span>
                       <span className="dots">
                         {trips.map((t) => (
-                          <Link to={`/trip/${t.uuid}`} key={t.uuid} title={directionLabel(t.direction)}>
+                          <Link to={`/trip/${t.uuid}`} key={t.uuid} title={tripLabel(t)}>
                             <span
                               className="dot"
                               style={
@@ -165,7 +166,7 @@ export default function DashboardPage() {
                           style={{ background: weekdayColor(new Date(t.startTime)) }}
                         />
                         <span className="main">
-                          <div className="title">{directionLabel(t.direction)}</div>
+                          <div className="title">{tripLabel(t)}</div>
                           <div className="sub">
                             {formatTime(t.startTime)}
                             {t.endTime

@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import SpeedMap from "../components/SpeedMap";
 import StatTile from "../components/StatTile";
-import { TO_HOME_COLOR, TO_OFFICE_COLOR } from "../lib/colors";
+import { TO_HOME_COLOR, TO_OFFICE_COLOR, UNIVERSITY_COLOR } from "../lib/colors";
+import { tripCategory, tripLabel } from "../lib/category";
 import { addDays, formatDay, formatDuration, formatKm, isoDay, mondayOf } from "../lib/format";
 import type { InsightsResponse, Trip } from "../types";
 
@@ -131,7 +132,9 @@ function DurationScatter({ commutes }: { commutes: Trip[] }) {
   }, [t0, t1]);
 
   const mean = (dir: string) => {
-    const list = commutes.filter((c) => c.direction === dir).map(durationMin);
+    const list = commutes
+      .filter((c) => c.direction === dir && tripCategory(c) === "office")
+      .map(durationMin);
     return list.length > 0 ? list.reduce((s, v) => s + v, 0) / list.length : null;
   };
   const meanOffice = mean("HOME_TO_OFFICE");
@@ -163,6 +166,18 @@ function DurationScatter({ commutes }: { commutes: Trip[] }) {
           </span>
           <span className="chip">
             <span className="swatch" style={{ background: TO_HOME_COLOR }} /> To home
+          </span>
+          <span className="chip">
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                border: `2px solid ${UNIVERSITY_COLOR}`,
+                display: "inline-block"
+              }}
+            />{" "}
+            University
           </span>
         </div>
       </div>
@@ -215,17 +230,20 @@ function DurationScatter({ commutes }: { commutes: Trip[] }) {
               opacity="0.6"
             />
           )}
-          {commutes.map((c) => (
-            <circle
-              key={c.uuid}
-              cx={x(c.startTime)}
-              cy={y(durationMin(c))}
-              r={hover?.uuid === c.uuid ? 5.5 : 3.5}
-              fill={c.direction === "HOME_TO_OFFICE" ? TO_OFFICE_COLOR : TO_HOME_COLOR}
-              stroke="var(--surface)"
-              strokeWidth="1.5"
-            />
-          ))}
+          {commutes.map((c) => {
+            const uni = tripCategory(c) === "university";
+            return (
+              <circle
+                key={c.uuid}
+                cx={x(c.startTime)}
+                cy={y(durationMin(c))}
+                r={hover?.uuid === c.uuid ? 5.5 : uni ? 4 : 3.5}
+                fill={uni ? "var(--surface)" : c.direction === "HOME_TO_OFFICE" ? TO_OFFICE_COLOR : TO_HOME_COLOR}
+                stroke={uni ? UNIVERSITY_COLOR : "var(--surface)"}
+                strokeWidth={uni ? 2 : 1.5}
+              />
+            );
+          })}
         </svg>
         {hover === null ? null : (
           <div
@@ -236,18 +254,15 @@ function DurationScatter({ commutes }: { commutes: Trip[] }) {
             }}
           >
             <strong>{Math.round(durationMin(hover))} min</strong> · {formatDay(hover.startTime)}
-            <span className="mode">
-              {" "}
-              · {hover.direction === "HOME_TO_OFFICE" ? "to office" : "to home"}
-            </span>
+            <span className="mode"> · {tripLabel(hover)}</span>
           </div>
         )}
       </div>
       <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-        Dashed lines are your averages
+        Dashed lines are your office-commute averages
         {meanOffice !== null ? ` — to office ${Math.round(meanOffice)} min` : ""}
-        {meanHome !== null ? `, to home ${Math.round(meanHome)} min` : ""}. Click-worthy outliers show
-        up on hover.
+        {meanHome !== null ? `, to home ${Math.round(meanHome)} min` : ""}. University rides (rings)
+        stay out of the averages.
       </div>
     </div>
   );
@@ -289,7 +304,7 @@ function WeekdayBars({ commutes }: { commutes: Trip[] }) {
   return (
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h2>Average duration by weekday</h2>
+        <h2>Average office commute by weekday</h2>
         <div className="legend">
           <span className="chip">
             <span className="swatch" style={{ background: TO_OFFICE_COLOR }} /> To office
@@ -378,16 +393,24 @@ export default function InsightsPage() {
     () => trips.filter((t) => t.endTime !== null && t.direction !== "FREE"),
     [trips]
   );
+  const officeCommutes = useMemo(
+    () => commutes.filter((t) => tripCategory(t) === "office"),
+    [commutes]
+  );
+  const universityRides = useMemo(
+    () => commutes.filter((t) => tripCategory(t) === "university"),
+    [commutes]
+  );
 
   const records = useMemo(() => {
     const byMinDuration = (dir: string) =>
-      commutes
+      officeCommutes
         .filter((c) => c.direction === dir && durationMin(c) > 5)
         .sort((a, b) => durationMin(a) - durationMin(b))[0] ?? null;
     const longest = [...trips].sort((a, b) => b.distanceMeters - a.distanceMeters)[0] ?? null;
     const fastestAvg = [...trips].sort((a, b) => b.averageSpeedKmh - a.averageSpeedKmh)[0] ?? null;
     return { toOffice: byMinDuration("HOME_TO_OFFICE"), toHome: byMinDuration("OFFICE_TO_HOME"), longest, fastestAvg };
-  }, [trips, commutes]);
+  }, [trips, officeCommutes]);
 
   const lifetime = useMemo(() => {
     const distance = trips.reduce((s, t) => s + t.distanceMeters, 0);
@@ -434,6 +457,7 @@ export default function InsightsPage() {
             <StatTile label="Trips" value={String(lifetime.count)} />
             <StatTile label="Active days" value={String(lifetime.activeDays)} />
             <StatTile label="Best commute-day streak" value={String(lifetime.streak)} unit="days" />
+            <StatTile label="University rides" value={String(universityRides.length)} />
           </div>
 
           <div className="tiles">
@@ -479,7 +503,7 @@ export default function InsightsPage() {
 
           <WeeklyBars trips={trips} />
           {commutes.length > 0 ? <DurationScatter commutes={commutes} /> : null}
-          {commutes.length > 0 ? <WeekdayBars commutes={commutes} /> : null}
+          {officeCommutes.length > 0 ? <WeekdayBars commutes={officeCommutes} /> : null}
 
           <div className="card">
             <h2>Where you fly, where you crawl</h2>
