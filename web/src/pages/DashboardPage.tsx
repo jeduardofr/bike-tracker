@@ -173,6 +173,10 @@ export default function DashboardPage() {
                               ? ` · ${formatDuration((t.endTime - t.startTime) / 1000)}`
                               : ""}{" "}
                             · {formatKm(t.distanceMeters)} km
+                            {data?.weather?.[t.uuid] === undefined
+                              ? ""
+                              : ` · ${data.weather[t.uuid].tempC.toFixed(0)}°C` +
+                                (data.weather[t.uuid].precipMm >= 0.2 ? " 🌧" : "")}
                           </div>
                         </span>
                         <span className="speed">{t.averageSpeedKmh.toFixed(1)} km/h</span>

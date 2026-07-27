@@ -156,6 +156,12 @@ export default function TripPage() {
               <div style={{ color: "var(--muted)", fontSize: 14 }}>
                 {formatDay(data.trip.startTime)} · {formatTime(data.trip.startTime)}
                 {data.trip.endTime ? ` – ${formatTime(data.trip.endTime)}` : ""}
+                {data.weather === null
+                  ? ""
+                  : ` · ${data.weather.tempC.toFixed(0)}°C` +
+                    (data.weather.precipMm >= 0.2
+                      ? ` · 🌧 ${data.weather.precipMm.toFixed(1)} mm/h`
+                      : "")}
               </div>
             </div>
           </div>

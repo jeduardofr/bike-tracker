@@ -19,9 +19,18 @@ export interface RoutePoint {
 /** [lat, lng, speedMps] — compact trace point for the overview map */
 export type TracePoint = [number, number, number];
 
+export interface TripWeather {
+  precipMm: number;
+  tempC: number;
+  windKmh: number;
+}
+
+export const RAINY_MM = 0.2;
+
 export interface OverviewResponse {
   trips: Trip[];
   traces: Record<string, TracePoint[]>;
+  weather: Record<string, TripWeather>;
 }
 
 export interface TripResponse {
@@ -29,6 +38,7 @@ export interface TripResponse {
   points: RoutePoint[];
   /** DEM elevation (m) parallel to points; null where lookup failed */
   elevations: Array<number | null>;
+  weather: TripWeather | null;
 }
 
 export interface GradeClass {
@@ -84,4 +94,5 @@ export interface InsightsResponse {
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
   pacing: Pacing | null;
+  tripWeather: Record<string, TripWeather>;
 }

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import ClimbsCard from "../components/ClimbsCard";
 import PacingCard from "../components/PacingCard";
+import WeatherCard from "../components/WeatherCard";
 import SpeedMap from "../components/SpeedMap";
 import StatTile from "../components/StatTile";
 import {
@@ -545,6 +546,8 @@ export default function InsightsPage() {
           <ClimbsCard climbs={data.climbs ?? []} />
 
           <PacingCard pacing={data.pacing ?? null} />
+
+          <WeatherCard trips={trips} weather={data.tripWeather ?? {}} />
 
           <div className="card">
             <h2>Where you fly, where you crawl</h2>
