@@ -45,9 +45,24 @@ export interface GradeSummary {
 /** [lat, lng, medianKmh] */
 export type SpeedBin = [number, number, number];
 
+export interface ClimbMonth {
+  month: string; // "2026-04"
+  walkMin: number;
+  rideMin: number;
+}
+
+export interface ClimbSpot {
+  lat: number;
+  lng: number;
+  gradePct: number;
+  walkMin: number;
+  months: ClimbMonth[];
+}
+
 export interface InsightsResponse {
   trips: Trip[];
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
+  climbs: ClimbSpot[];
 }

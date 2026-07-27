@@ -189,6 +189,10 @@ button:hover,
   background: #14181c;
 }
 
+.map-wrap.short .leaflet-container {
+  height: 260px;
+}
+
 .day-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -317,6 +321,14 @@ button:hover,
 
 .legend .swatch.dashed {
   background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px);
+}
+
+.legend .dot,
+.card .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .chart-wrap {

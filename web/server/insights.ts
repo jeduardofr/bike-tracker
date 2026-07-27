@@ -15,11 +15,26 @@ export interface GradeSummary {
   downhill: GradeClass;
 }
 
+export interface ClimbMonth {
+  month: string; // "2026-04"
+  walkMin: number;
+  rideMin: number;
+}
+
+export interface ClimbSpot {
+  lat: number;
+  lng: number;
+  gradePct: number;
+  walkMin: number; // total walking minutes here
+  months: ClimbMonth[];
+}
+
 export interface Insights {
   trips: TripRow[];
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
+  climbs: ClimbSpot[];
 }
 
 const BIN_DEG = 0.00025; // ~27 m
@@ -54,10 +69,18 @@ interface Pt {
   ts: number;
 }
 
+const CLIMB_BIN_DEG = 0.0004; // ~44 m cells for locating walked climbs
+const CLIMB_MERGE_M = 120; // cells this close belong to the same climb
+const MIN_WALK_SEC = 120; // ignore spots with under 2 min of walking total
+
+// Guadalajara is UTC-6 year-round
+const monthOf = (ts: number) => new Date(ts - 6 * 3600 * 1000).toISOString().slice(0, 7);
+
 async function buildTerrain(): Promise<{
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
+  climbs: ClimbSpot[];
 }> {
   const rs = await db().execute(
     `SELECT trip_uuid, latitude, longitude, speed_mps, timestamp, accuracy
@@ -97,12 +120,17 @@ async function buildTerrain(): Promise<{
 
   // --- terrain: classify riding time by grade over a rolling window ---
   let gradeSummary: GradeSummary | null = null;
+  let climbs: ClimbSpot[] = [];
   const elevations = await elevationsFor(
     points.map((p) => ({ latitude: p.lat, longitude: p.lng }))
   );
   if (elevations.some((e) => e !== null)) {
     const speedsBy: Record<string, number[]> = { uphill: [], flat: [], downhill: [] };
     const secondsBy: Record<string, number> = { uphill: 0, flat: 0, downhill: 0 };
+    const climbCells = new Map<
+      string,
+      { lat: number; lng: number; n: number; gradeSum: number; months: Map<string, { walk: number; ride: number }> }
+    >();
 
     let anchor = 0;
     let anchorDist = 0; // cumulative meters at anchor
@@ -132,12 +160,33 @@ async function buildTerrain(): Promise<{
       const eNow = elevations[i];
       const eBack = elevations[anchor];
       if (windowDist < GRADE_WINDOW_M * 0.5 || eNow === null || eBack === null) continue;
-      if (c.speed <= RIDING_MPS) continue; // riding segments only
 
       const grade = (eNow - eBack) / windowDist;
-      const cls = grade > GRADE_CUTOFF ? "uphill" : grade < -GRADE_CUTOFF ? "downhill" : "flat";
-      speedsBy[cls].push(c.speed * 3.6);
-      secondsBy[cls] += dt;
+      const riding = c.speed > RIDING_MPS;
+      if (riding) {
+        const cls = grade > GRADE_CUTOFF ? "uphill" : grade < -GRADE_CUTOFF ? "downhill" : "flat";
+        speedsBy[cls].push(c.speed * 3.6);
+        secondsBy[cls] += dt;
+      }
+
+      // walked-climb detection: any moving pair on a >1.5% uphill
+      if (grade > GRADE_CUTOFF && c.speed > 0.3) {
+        const key = `${Math.round(c.lat / CLIMB_BIN_DEG)},${Math.round(c.lng / CLIMB_BIN_DEG)}`;
+        let cell = climbCells.get(key);
+        if (!cell) {
+          cell = { lat: 0, lng: 0, n: 0, gradeSum: 0, months: new Map() };
+          climbCells.set(key, cell);
+        }
+        cell.lat += c.lat;
+        cell.lng += c.lng;
+        cell.n++;
+        cell.gradeSum += grade;
+        const mo = monthOf(c.ts);
+        const m = cell.months.get(mo) ?? { walk: 0, ride: 0 };
+        if (riding) m.ride += dt;
+        else m.walk += dt;
+        cell.months.set(mo, m);
+      }
     }
 
     if (speedsBy.uphill.length + speedsBy.flat.length + speedsBy.downhill.length > 100) {
@@ -147,9 +196,60 @@ async function buildTerrain(): Promise<{
       });
       gradeSummary = { uphill: cls("uphill"), flat: cls("flat"), downhill: cls("downhill") };
     }
+
+    // cluster walked-climb cells into spots
+    const cells = [...climbCells.values()]
+      .map((c) => {
+        let walk = 0;
+        let ride = 0;
+        c.months.forEach((m) => {
+          walk += m.walk;
+          ride += m.ride;
+        });
+        return { lat: c.lat / c.n, lng: c.lng / c.n, grade: c.gradeSum / c.n, walk, ride, months: c.months };
+      })
+      .filter((c) => c.walk >= MIN_WALK_SEC)
+      .sort((a, b) => b.walk - a.walk);
+
+    const groups: Array<typeof cells> = [];
+    for (const cell of cells) {
+      const host = groups.find(
+        (g) => haversine(g[0].lat, g[0].lng, cell.lat, cell.lng) < CLIMB_MERGE_M
+      );
+      if (host) host.push(cell);
+      else groups.push([cell]);
+    }
+
+    climbs = groups
+      .slice(0, 8)
+      .map((group) => {
+        const monthAgg = new Map<string, { walk: number; ride: number }>();
+        group.forEach((c) =>
+          c.months.forEach((m, mo) => {
+            const t = monthAgg.get(mo) ?? { walk: 0, ride: 0 };
+            t.walk += m.walk;
+            t.ride += m.ride;
+            monthAgg.set(mo, t);
+          })
+        );
+        return {
+          lat: Number((group.reduce((s, c) => s + c.lat, 0) / group.length).toFixed(6)),
+          lng: Number((group.reduce((s, c) => s + c.lng, 0) / group.length).toFixed(6)),
+          gradePct: Number(((group.reduce((s, c) => s + c.grade, 0) / group.length) * 100).toFixed(1)),
+          walkMin: Number((group.reduce((s, c) => s + c.walk, 0) / 60).toFixed(1)),
+          months: [...monthAgg.entries()]
+            .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+            .map(([month, v]) => ({
+              month,
+              walkMin: Number((v.walk / 60).toFixed(1)),
+              rideMin: Number((v.ride / 60).toFixed(1))
+            }))
+        };
+      })
+      .sort((a, b) => b.walkMin - a.walkMin);
   }
 
-  return { bins, medianKmh, gradeSummary };
+  return { bins, medianKmh, gradeSummary, climbs };
 }
 
 export async function getInsights(): Promise<Insights> {
