@@ -1,4 +1,4 @@
-import type { InsightsResponse, OverviewResponse, TripResponse } from "./types";
+import type { HistoryResponse, InsightsResponse, OverviewResponse, TripResponse } from "./types";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -30,5 +30,9 @@ export const api = {
   overview: (from: number, to: number) =>
     get<OverviewResponse>(`/api/overview?from=${from}&to=${to}`),
   insights: () => get<InsightsResponse>("/api/insights"),
+  history: (before?: number, limit = 20) =>
+    get<HistoryResponse>(
+      `/api/history?limit=${limit}${before !== undefined ? `&before=${before}` : ""}`
+    ),
   trip: (uuid: string) => get<TripResponse>(`/api/trip/${encodeURIComponent(uuid)}`)
 };

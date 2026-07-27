@@ -48,6 +48,24 @@ export async function tripsInRange(from: number, to: number): Promise<TripRow[]>
   }));
 }
 
+export async function tripsBefore(before: number, limit: number): Promise<TripRow[]> {
+  const rs = await db().execute({
+    sql: `SELECT uuid, start_time, end_time, distance_meters, average_speed_kmh, direction
+          FROM trips
+          WHERE is_completed = 1 AND start_time < ?
+          ORDER BY start_time DESC LIMIT ?`,
+    args: [before, limit]
+  });
+  return rs.rows.map((r) => ({
+    uuid: String(r.uuid),
+    startTime: Number(r.start_time),
+    endTime: r.end_time == null ? null : Number(r.end_time),
+    distanceMeters: Number(r.distance_meters),
+    averageSpeedKmh: Number(r.average_speed_kmh),
+    direction: String(r.direction)
+  }));
+}
+
 export async function tripByUuid(uuid: string): Promise<TripRow | null> {
   const rs = await db().execute({
     sql: `SELECT uuid, start_time, end_time, distance_meters, average_speed_kmh, direction

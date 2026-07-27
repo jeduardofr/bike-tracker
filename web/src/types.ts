@@ -33,6 +33,12 @@ export interface OverviewResponse {
   weather: Record<string, TripWeather>;
 }
 
+export interface HistoryResponse {
+  trips: Trip[];
+  weather: Record<string, TripWeather>;
+  hasMore: boolean;
+}
+
 export interface TripResponse {
   trip: Trip;
   points: RoutePoint[];

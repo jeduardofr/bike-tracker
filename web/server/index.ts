@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { isAuthenticated, login, requireAuth } from "./auth.js";
-import { overviewForTrips, pointsForTrip, tripByUuid, tripsInRange } from "./db.js";
+import { overviewForTrips, pointsForTrip, tripByUuid, tripsBefore, tripsInRange } from "./db.js";
 import { ensureDem } from "./dem.js";
 import { elevationsFor } from "./elevation.js";
 import { getInsights } from "./insights.js";
@@ -53,6 +53,15 @@ app.get("/api/overview", async (c) => {
   const trips = await tripsInRange(range.from, range.to);
   const traces = await overviewForTrips(trips.map((t) => t.uuid));
   return c.json({ trips, traces, weather: await weatherMap(trips) });
+});
+
+app.get("/api/history", async (c) => {
+  const beforeRaw = Number(c.req.query("before"));
+  const before = Number.isFinite(beforeRaw) ? beforeRaw : Date.now() + 24 * 3600 * 1000;
+  const limitRaw = Number(c.req.query("limit"));
+  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, limitRaw)) : 20;
+  const trips = await tripsBefore(before, limit);
+  return c.json({ trips, weather: await weatherMap(trips), hasMore: trips.length === limit });
 });
 
 app.get("/api/insights", async (c) => {

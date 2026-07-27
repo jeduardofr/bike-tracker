@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
+import TripRowItem from "../components/TripRowItem";
 import { weekdayColor } from "../lib/colors";
 import { tripLabel } from "../lib/category";
 import { addDays, formatDay, formatDuration, formatKm, formatTime, isoDay, mondayOf } from "../lib/format";
@@ -85,6 +86,9 @@ export default function DashboardPage() {
       <div className="topbar">
         <h1>🚲 Bike Tracker</h1>
         <div className="week-nav">
+          <Link to="/history" className="btn">
+            History
+          </Link>
           <Link to="/insights" className="btn">
             Insights
           </Link>
@@ -160,27 +164,7 @@ export default function DashboardPage() {
                     .slice()
                     .sort((a, b) => b.startTime - a.startTime)
                     .map((t) => (
-                      <Link to={`/trip/${t.uuid}`} className="trip-row" key={t.uuid}>
-                        <span
-                          className="bar"
-                          style={{ background: weekdayColor(new Date(t.startTime)) }}
-                        />
-                        <span className="main">
-                          <div className="title">{tripLabel(t)}</div>
-                          <div className="sub">
-                            {formatTime(t.startTime)}
-                            {t.endTime
-                              ? ` · ${formatDuration((t.endTime - t.startTime) / 1000)}`
-                              : ""}{" "}
-                            · {formatKm(t.distanceMeters)} km
-                            {data?.weather?.[t.uuid] === undefined
-                              ? ""
-                              : ` · ${data.weather[t.uuid].tempC.toFixed(0)}°C` +
-                                (data.weather[t.uuid].precipMm >= 0.2 ? " 🌧" : "")}
-                          </div>
-                        </span>
-                        <span className="speed">{t.averageSpeedKmh.toFixed(1)} km/h</span>
-                      </Link>
+                      <TripRowItem key={t.uuid} trip={t} weather={data?.weather?.[t.uuid]} />
                     ))}
                 </div>
               ))}
