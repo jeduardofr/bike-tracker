@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MapContainer, Polyline, TileLayer } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, TileLayer } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
 
 export interface MapLine {
@@ -10,9 +10,11 @@ export interface MapLine {
 
 interface Props {
   lines: MapLine[];
+  /** position to spotlight (linked hover from the charts) */
+  highlight?: [number, number] | null;
 }
 
-export default function TripMap({ lines }: Props) {
+export default function TripMap({ lines, highlight }: Props) {
   const bounds = useMemo(() => {
     const b = new LatLngBounds([]);
     lines.forEach((line) => line.positions.forEach((p) => b.extend(p)));
@@ -40,6 +42,13 @@ export default function TripMap({ lines }: Props) {
             }}
           />
         ))}
+        {highlight == null ? null : (
+          <CircleMarker
+            center={highlight}
+            radius={7}
+            pathOptions={{ color: "#ffffff", weight: 2.5, fillColor: "#43A047", fillOpacity: 1 }}
+          />
+        )}
       </MapContainer>
     </div>
   );

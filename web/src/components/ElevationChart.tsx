@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { FAST_COLOR, NEUTRAL_COLOR, SLOW_COLOR } from "../lib/colors";
+import { GRADE_WINDOW_M, gradeColor } from "../lib/grade";
 import { haversineMeters } from "../lib/segments";
 import type { RoutePoint } from "../types";
 
 const W = 860;
 const H = 200;
 const PAD = { top: 24, right: 12, bottom: 26, left: 44 };
-const GRADE_CUTOFF = 0.015;
-const GRADE_WINDOW_M = 100;
 
 export interface ElevPoint {
   point: RoutePoint;
@@ -18,6 +17,7 @@ interface Sample {
   km: number;
   m: number;
   grade: number;
+  ts: number;
 }
 
 export function demClimb(entries: ElevPoint[]): number {
@@ -36,11 +36,13 @@ export function demClimb(entries: ElevPoint[]): number {
 function prepare(entries: ElevPoint[]): Sample[] {
   if (entries.length < 2) return [];
   // cumulative distance
-  const raw: Array<{ km: number; m: number }> = [{ km: 0, m: entries[0].elev }];
+  const raw: Array<{ km: number; m: number; ts: number }> = [
+    { km: 0, m: entries[0].elev, ts: entries[0].point.timestamp }
+  ];
   let cum = 0;
   for (let i = 1; i < entries.length; i++) {
     cum += haversineMeters(entries[i - 1].point, entries[i].point);
-    raw.push({ km: cum / 1000, m: entries[i].elev });
+    raw.push({ km: cum / 1000, m: entries[i].elev, ts: entries[i].point.timestamp });
   }
   const step = raw.length > 400 ? Math.ceil(raw.length / 400) : 1;
   const sampled = raw.filter((_, i) => i % step === 0 || i === raw.length - 1);
@@ -55,16 +57,35 @@ function prepare(entries: ElevPoint[]): Sample[] {
     while (back > 0 && (s.km - sampled[back].km) * 1000 < GRADE_WINDOW_M) back--;
     const dd = (s.km - sampled[back].km) * 1000;
     const grade = dd > 20 ? (s.m - sampled[back].m) / dd : 0;
-    return { km: s.km, m, grade };
+    return { km: s.km, m, grade, ts: s.ts };
   });
 }
 
-const gradeColor = (g: number) =>
-  g > GRADE_CUTOFF ? SLOW_COLOR : g < -GRADE_CUTOFF ? FAST_COLOR : NEUTRAL_COLOR;
+interface Props {
+  entries: ElevPoint[];
+  /** shared hover timestamp for cross-chart/map linking */
+  hoverTs?: number | null;
+  onHoverTs?: (ts: number | null) => void;
+}
 
-export default function ElevationChart({ entries }: { entries: ElevPoint[] }) {
-  const [hover, setHover] = useState<Sample | null>(null);
+export default function ElevationChart({ entries, hoverTs, onHoverTs }: Props) {
+  const [localHover, setLocalHover] = useState<Sample | null>(null);
   const data = useMemo(() => prepare(entries), [entries]);
+
+  const hover = useMemo(() => {
+    const ts = hoverTs;
+    if (ts == null) return onHoverTs ? null : localHover;
+    let best: Sample | null = null;
+    for (const s of data) {
+      if (best === null || Math.abs(s.ts - ts) < Math.abs(best.ts - ts)) best = s;
+    }
+    return best;
+  }, [hoverTs, localHover, data, onHoverTs]);
+
+  const setHover = (s: Sample | null) => {
+    if (onHoverTs) onHoverTs(s === null ? null : s.ts);
+    else setLocalHover(s);
+  };
 
   const kmMax = data.length > 0 ? data[data.length - 1].km : 1;
   const mLo = Math.floor((Math.min(...data.map((d) => d.m)) - 5) / 10) * 10;

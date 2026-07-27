@@ -17,6 +17,9 @@ interface ChartPoint {
 
 interface Props {
   points: RoutePoint[]; // accuracy-filtered, timestamp-ascending
+  /** shared hover timestamp for cross-chart/map linking */
+  hoverTs?: number | null;
+  onHoverTs?: (ts: number | null) => void;
 }
 
 function prepare(points: RoutePoint[]): ChartPoint[] {
@@ -36,11 +39,27 @@ function niceMax(v: number): number {
   return Math.max(5, Math.ceil(v / 5) * 5);
 }
 
-export default function SpeedChart({ points }: Props) {
+export default function SpeedChart({ points, hoverTs, onHoverTs }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [hover, setHover] = useState<ChartPoint | null>(null);
+  const [localHover, setLocalHover] = useState<ChartPoint | null>(null);
 
   const data = useMemo(() => prepare(points), [points]);
+
+  // controlled by the shared timestamp when provided, else local state
+  const hover = useMemo(() => {
+    const ts = hoverTs;
+    if (ts == null) return onHoverTs ? null : localHover;
+    let best: ChartPoint | null = null;
+    for (const p of data) {
+      if (best === null || Math.abs(p.t - ts) < Math.abs(best.t - ts)) best = p;
+    }
+    return best;
+  }, [hoverTs, localHover, data, onHoverTs]);
+
+  const setHover = (p: ChartPoint | null) => {
+    if (onHoverTs) onHoverTs(p === null ? null : p.t);
+    else setLocalHover(p);
+  };
   const t0 = data.length > 0 ? data[0].t : 0;
   const t1 = data.length > 0 ? data[data.length - 1].t : 1;
   const vMax = useMemo(() => niceMax(Math.max(...data.map((d) => d.v), 0)), [data]);

@@ -5,10 +5,17 @@ import ElevationChart, { demClimb, type ElevPoint } from "../components/Elevatio
 import SpeedChart from "../components/SpeedChart";
 import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
-import { RIDE_COLOR, WALK_COLOR } from "../lib/colors";
+import { FAST_COLOR, NEUTRAL_COLOR, RIDE_COLOR, SLOW_COLOR, WALK_COLOR } from "../lib/colors";
 import { tripLabel } from "../lib/category";
 import { formatDay, formatDuration, formatKm, formatTime } from "../lib/format";
-import { buildSegments, computeMetrics, filterAccurate, haversineMeters } from "../lib/segments";
+import { GRADE_WINDOW_M, gradeColor } from "../lib/grade";
+import {
+  RIDING_THRESHOLD_MPS,
+  buildSegments,
+  computeMetrics,
+  filterAccurate,
+  haversineMeters
+} from "../lib/segments";
 import type { RoutePoint, TripResponse } from "../types";
 
 interface Split {
@@ -81,6 +88,57 @@ export default function TripPage() {
     [points]
   );
 
+  // linked hover: charts publish a timestamp; map + both charts reflect it
+  const [hoverTs, setHoverTs] = useState<number | null>(null);
+  const highlight = useMemo<[number, number] | null>(() => {
+    if (hoverTs === null || points.length === 0) return null;
+    let best = points[0];
+    for (const p of points) {
+      if (Math.abs(p.timestamp - hoverTs) < Math.abs(best.timestamp - hoverTs)) best = p;
+    }
+    return [best.latitude, best.longitude];
+  }, [hoverTs, points]);
+
+  // grade overlay: color = DEM grade class, dash still = walking
+  const [mapMode, setMapMode] = useState<"mode" | "grade">("mode");
+  const gradeLines: MapLine[] = useMemo(() => {
+    const n = elevPoints.length;
+    if (n < 2) return [];
+    const cum: number[] = [0];
+    for (let i = 1; i < n; i++) {
+      cum.push(cum[i - 1] + haversineMeters(elevPoints[i - 1].point, elevPoints[i].point));
+    }
+    let anchor = 0;
+    const styleAt = (i: number) => {
+      while (anchor < i - 1 && cum[i] - cum[anchor] > GRADE_WINDOW_M) anchor++;
+      const dd = cum[i] - cum[anchor];
+      const grade = dd > 20 ? (elevPoints[i].elev - elevPoints[anchor].elev) / dd : 0;
+      return {
+        color: gradeColor(grade),
+        dashed: elevPoints[i].point.speedMps <= RIDING_THRESHOLD_MPS
+      };
+    };
+    const pos = (i: number): [number, number] => [
+      elevPoints[i].point.latitude,
+      elevPoints[i].point.longitude
+    ];
+    const lines: MapLine[] = [];
+    let run: [number, number][] = [pos(0)];
+    let current = styleAt(1);
+    for (let i = 1; i < n; i++) {
+      const s = styleAt(i);
+      run.push(pos(i));
+      if (s.color !== current.color || s.dashed !== current.dashed) {
+        lines.push({ positions: run, ...current });
+        run = [pos(i)];
+        current = s;
+      }
+    }
+    if (run.length >= 2) lines.push({ positions: run, ...current });
+    return lines;
+  }, [elevPoints]);
+  const showGrade = mapMode === "grade" && gradeLines.length > 0;
+
   return (
     <div className="container">
       {error ? (
@@ -131,22 +189,68 @@ export default function TripPage() {
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                  gap: 12,
+                  flexWrap: "wrap"
+                }}
+              >
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => setMapMode("mode")}
+                    style={mapMode === "mode" ? { borderColor: "var(--accent)" } : undefined}
+                  >
+                    Ride/Walk
+                  </button>
+                  <button
+                    onClick={() => setMapMode("grade")}
+                    disabled={gradeLines.length === 0}
+                    style={showGrade ? { borderColor: "var(--accent)" } : undefined}
+                  >
+                    Grade
+                  </button>
+                </div>
                 <div className="legend">
-                  <span className="chip">
-                    <span className="swatch" style={{ background: RIDE_COLOR }} /> Riding
-                  </span>
-                  <span className="chip" style={{ color: WALK_COLOR }}>
-                    <span className="swatch dashed" />{" "}
-                    <span style={{ color: "var(--muted)" }}>Walking</span>
-                  </span>
+                  {showGrade ? (
+                    <>
+                      <span className="chip">
+                        <span className="swatch" style={{ background: SLOW_COLOR }} /> Climb
+                      </span>
+                      <span className="chip">
+                        <span className="swatch" style={{ background: NEUTRAL_COLOR }} /> Flat
+                      </span>
+                      <span className="chip">
+                        <span className="swatch" style={{ background: FAST_COLOR }} /> Descent
+                      </span>
+                      <span className="chip">
+                        <span className="swatch dashed" style={{ color: "var(--muted)" }} />{" "}
+                        <span style={{ color: "var(--muted)" }}>Walking</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="chip">
+                        <span className="swatch" style={{ background: RIDE_COLOR }} /> Riding
+                      </span>
+                      <span className="chip" style={{ color: WALK_COLOR }}>
+                        <span className="swatch dashed" />{" "}
+                        <span style={{ color: "var(--muted)" }}>Walking</span>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
-              <TripMap lines={mapLines} />
+              <TripMap lines={showGrade ? gradeLines : mapLines} highlight={highlight} />
 
-              <SpeedChart points={points} />
+              <SpeedChart points={points} hoverTs={hoverTs} onHoverTs={setHoverTs} />
 
-              {elevPoints.length > 2 ? <ElevationChart entries={elevPoints} /> : null}
+              {elevPoints.length > 2 ? (
+                <ElevationChart entries={elevPoints} hoverTs={hoverTs} onHoverTs={setHoverTs} />
+              ) : null}
 
               {splits.length > 0 ? (
                 <div className="card">
