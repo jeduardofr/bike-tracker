@@ -25,7 +25,10 @@ export interface ClimbSpot {
   lat: number;
   lng: number;
   gradePct: number;
-  walkMin: number; // total walking minutes here
+  walkMin: number; // total walking minutes here (both directions)
+  /** share of morning moving time here spent walking (sweat strategy, not fitness) */
+  amWalkPct: number | null;
+  /** evening-only trend — the actual energy signal */
   months: ClimbMonth[];
 }
 
@@ -67,6 +70,21 @@ interface Pt {
   lng: number;
   speed: number;
   ts: number;
+}
+
+async function tripDirections(): Promise<Map<string, string>> {
+  const rs = await db().execute(
+    `SELECT uuid, direction, distance_meters FROM trips WHERE is_completed = 1`
+  );
+  const map = new Map<string, string>();
+  rs.rows.forEach((r) => {
+    const direction = String(r.direction);
+    // climbs are tracked on office commutes only (university/free rides excluded)
+    if (direction !== "FREE" && Number(r.distance_meters) >= 7800) {
+      map.set(String(r.uuid), direction);
+    }
+  });
+  return map;
 }
 
 const CLIMB_BIN_DEG = 0.0004; // ~44 m cells for locating walked climbs
@@ -127,9 +145,17 @@ async function buildTerrain(): Promise<{
   if (elevations.some((e) => e !== null)) {
     const speedsBy: Record<string, number[]> = { uphill: [], flat: [], downhill: [] };
     const secondsBy: Record<string, number> = { uphill: 0, flat: 0, downhill: 0 };
+    const commuteDir = await tripDirections();
     const climbCells = new Map<
       string,
-      { lat: number; lng: number; n: number; gradeSum: number; months: Map<string, { walk: number; ride: number }> }
+      {
+        lat: number;
+        lng: number;
+        n: number;
+        gradeSum: number;
+        am: { walk: number; ride: number };
+        months: Map<string, { walk: number; ride: number }>; // evening only
+      }
     >();
 
     let anchor = 0;
@@ -169,23 +195,30 @@ async function buildTerrain(): Promise<{
         secondsBy[cls] += dt;
       }
 
-      // walked-climb detection: any moving pair on a >1.5% uphill
-      if (grade > GRADE_CUTOFF && c.speed > 0.3) {
+      // walked-climb detection: any moving pair on a >1.5% uphill of an office commute
+      const direction = commuteDir.get(c.trip);
+      if (direction !== undefined && grade > GRADE_CUTOFF && c.speed > 0.3) {
         const key = `${Math.round(c.lat / CLIMB_BIN_DEG)},${Math.round(c.lng / CLIMB_BIN_DEG)}`;
         let cell = climbCells.get(key);
         if (!cell) {
-          cell = { lat: 0, lng: 0, n: 0, gradeSum: 0, months: new Map() };
+          cell = { lat: 0, lng: 0, n: 0, gradeSum: 0, am: { walk: 0, ride: 0 }, months: new Map() };
           climbCells.set(key, cell);
         }
         cell.lat += c.lat;
         cell.lng += c.lng;
         cell.n++;
         cell.gradeSum += grade;
-        const mo = monthOf(c.ts);
-        const m = cell.months.get(mo) ?? { walk: 0, ride: 0 };
-        if (riding) m.ride += dt;
-        else m.walk += dt;
-        cell.months.set(mo, m);
+        if (direction === "HOME_TO_OFFICE") {
+          // mornings: walking here is sweat strategy — tracked separately, no trend
+          if (riding) cell.am.ride += dt;
+          else cell.am.walk += dt;
+        } else {
+          const mo = monthOf(c.ts);
+          const m = cell.months.get(mo) ?? { walk: 0, ride: 0 };
+          if (riding) m.ride += dt;
+          else m.walk += dt;
+          cell.months.set(mo, m);
+        }
       }
     }
 
@@ -200,13 +233,18 @@ async function buildTerrain(): Promise<{
     // cluster walked-climb cells into spots
     const cells = [...climbCells.values()]
       .map((c) => {
-        let walk = 0;
-        let ride = 0;
+        let walk = c.am.walk;
         c.months.forEach((m) => {
           walk += m.walk;
-          ride += m.ride;
         });
-        return { lat: c.lat / c.n, lng: c.lng / c.n, grade: c.gradeSum / c.n, walk, ride, months: c.months };
+        return {
+          lat: c.lat / c.n,
+          lng: c.lng / c.n,
+          grade: c.gradeSum / c.n,
+          walk,
+          am: c.am,
+          months: c.months
+        };
       })
       .filter((c) => c.walk >= MIN_WALK_SEC)
       .sort((a, b) => b.walk - a.walk);
@@ -224,19 +262,25 @@ async function buildTerrain(): Promise<{
       .slice(0, 8)
       .map((group) => {
         const monthAgg = new Map<string, { walk: number; ride: number }>();
-        group.forEach((c) =>
+        let amWalk = 0;
+        let amRide = 0;
+        group.forEach((c) => {
+          amWalk += c.am.walk;
+          amRide += c.am.ride;
           c.months.forEach((m, mo) => {
             const t = monthAgg.get(mo) ?? { walk: 0, ride: 0 };
             t.walk += m.walk;
             t.ride += m.ride;
             monthAgg.set(mo, t);
-          })
-        );
+          });
+        });
         return {
           lat: Number((group.reduce((s, c) => s + c.lat, 0) / group.length).toFixed(6)),
           lng: Number((group.reduce((s, c) => s + c.lng, 0) / group.length).toFixed(6)),
           gradePct: Number(((group.reduce((s, c) => s + c.grade, 0) / group.length) * 100).toFixed(1)),
           walkMin: Number((group.reduce((s, c) => s + c.walk, 0) / 60).toFixed(1)),
+          amWalkPct:
+            amWalk + amRide >= 60 ? Number(((100 * amWalk) / (amWalk + amRide)).toFixed(0)) : null,
           months: [...monthAgg.entries()]
             .sort((a, b) => (a[0] < b[0] ? -1 : 1))
             .map(([month, v]) => ({

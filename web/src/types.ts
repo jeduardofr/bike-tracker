@@ -56,6 +56,9 @@ export interface ClimbSpot {
   lng: number;
   gradePct: number;
   walkMin: number;
+  /** morning walk share (sweat strategy) — null when the spot is evening-only */
+  amWalkPct: number | null;
+  /** evening-only monthly trend */
   months: ClimbMonth[];
 }
 
