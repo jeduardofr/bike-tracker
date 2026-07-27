@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import ClimbsCard from "../components/ClimbsCard";
+import PacingCard from "../components/PacingCard";
 import SpeedMap from "../components/SpeedMap";
 import StatTile from "../components/StatTile";
 import {
@@ -542,6 +543,8 @@ export default function InsightsPage() {
           )}
 
           <ClimbsCard climbs={data.climbs ?? []} />
+
+          <PacingCard pacing={data.pacing ?? null} />
 
           <div className="card">
             <h2>Where you fly, where you crawl</h2>

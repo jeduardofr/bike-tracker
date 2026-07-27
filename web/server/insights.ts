@@ -32,12 +32,29 @@ export interface ClimbSpot {
   months: ClimbMonth[];
 }
 
+export interface PacingTarget {
+  gradePct: number;
+  dryKmh: number; // 90% of comfort effort — flat-cruise sweat level
+  pushKmh: number; // 120% of comfort effort — "slightly warm"
+  currentKmh: number | null; // what you actually ride at this grade in the morning
+}
+
+export interface Pacing {
+  massKg: number;
+  comfortWatts: number;
+  flatKmh: number;
+  targets: PacingTarget[];
+  /** morning walked-climb strategies, median minutes per trip */
+  morning: { walkMinNow: number; dryMin: number; pushMin: number } | null;
+}
+
 export interface Insights {
   trips: TripRow[];
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
+  pacing: Pacing | null;
 }
 
 const BIN_DEG = 0.00025; // ~27 m
@@ -94,11 +111,34 @@ const MIN_WALK_SEC = 120; // ignore spots with under 2 min of walking total
 // Guadalajara is UTC-6 year-round
 const monthOf = (ts: number) => new Date(ts - 6 * 3600 * 1000).toISOString().slice(0, 7);
 
+// --- pacing physics (commuter model at ~1550 m altitude) ---
+const MASS_KG = Number(process.env.RIDER_MASS_KG ?? 85); // rider + bike + backpack
+const GRAV = 9.81;
+const CRR = 0.008; // city tires on asphalt
+const CDA = 0.55; // upright commuter
+const RHO = 0.98; // air density at Guadalajara's altitude
+const CLIMB_COOLING_MARGIN = 0.9; // ride climbs at 90% of flat power: less airflow, same sweat
+
+const powerAt = (v: number, grade: number) =>
+  MASS_KG * GRAV * v * (grade + CRR) + 0.5 * RHO * CDA * v ** 3;
+
+function speedAtPower(watts: number, grade: number): number {
+  let lo = 0.3;
+  let hi = 15;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2;
+    if (powerAt(mid, grade) > watts) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 async function buildTerrain(): Promise<{
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
+  pacing: Pacing | null;
 }> {
   const rs = await db().execute(
     `SELECT trip_uuid, latitude, longitude, speed_mps, timestamp, accuracy
@@ -139,6 +179,7 @@ async function buildTerrain(): Promise<{
   // --- terrain: classify riding time by grade over a rolling window ---
   let gradeSummary: GradeSummary | null = null;
   let climbs: ClimbSpot[] = [];
+  let pacing: Pacing | null = null;
   const elevations = await elevationsFor(
     points.map((p) => ({ latitude: p.lat, longitude: p.lng }))
   );
@@ -146,6 +187,9 @@ async function buildTerrain(): Promise<{
     const speedsBy: Record<string, number[]> = { uphill: [], flat: [], downhill: [] };
     const secondsBy: Record<string, number> = { uphill: 0, flat: 0, downhill: 0 };
     const commuteDir = await tripDirections();
+    const morningFlat: number[] = []; // riding speeds (m/s) on flat, mornings
+    const morningByBucket = new Map<number, number[]>(); // grade % -> riding speeds
+    const walkByTrip = new Map<string, { sec: number; segs: Array<{ dist: number; grade: number }> }>();
     const climbCells = new Map<
       string,
       {
@@ -172,7 +216,8 @@ async function buildTerrain(): Promise<{
       }
       const dt = (c.ts - p.ts) / 1000;
       if (!(dt > 0 && dt < 120)) continue;
-      cum += haversine(p.lat, p.lng, c.lat, c.lng);
+      const stepDist = haversine(p.lat, p.lng, c.lat, c.lng);
+      cum += stepDist;
 
       // advance anchor to keep the window near GRADE_WINDOW_M
       while (anchor < i - 1 && cum - anchorDist > GRADE_WINDOW_M * 1.5) {
@@ -195,8 +240,26 @@ async function buildTerrain(): Promise<{
         secondsBy[cls] += dt;
       }
 
-      // walked-climb detection: any moving pair on a >1.5% uphill of an office commute
+      // morning pacing inputs (office commutes toward the office)
       const direction = commuteDir.get(c.trip);
+      if (direction === "HOME_TO_OFFICE") {
+        if (riding) {
+          if (Math.abs(grade) <= 0.015) morningFlat.push(c.speed);
+          const bucket = Math.round(grade * 100);
+          if (bucket >= 2 && bucket <= 4) {
+            const list = morningByBucket.get(bucket) ?? [];
+            list.push(c.speed);
+            morningByBucket.set(bucket, list);
+          }
+        } else if (grade > GRADE_CUTOFF && c.speed > 0.3) {
+          const w = walkByTrip.get(c.trip) ?? { sec: 0, segs: [] };
+          w.sec += dt;
+          w.segs.push({ dist: stepDist, grade });
+          walkByTrip.set(c.trip, w);
+        }
+      }
+
+      // walked-climb detection: any moving pair on a >1.5% uphill of an office commute
       if (direction !== undefined && grade > GRADE_CUTOFF && c.speed > 0.3) {
         const key = `${Math.round(c.lat / CLIMB_BIN_DEG)},${Math.round(c.lng / CLIMB_BIN_DEG)}`;
         let cell = climbCells.get(key);
@@ -291,9 +354,54 @@ async function buildTerrain(): Promise<{
         };
       })
       .sort((a, b) => b.walkMin - a.walkMin);
+
+    // --- morning pacing plan ---
+    if (morningFlat.length > 50) {
+      const vFlat = median(morningFlat);
+      const comfortWatts = powerAt(vFlat, 0);
+      const dryWatts = comfortWatts * CLIMB_COOLING_MARGIN;
+      const pushWatts = comfortWatts * 1.2;
+      const targets = [2, 3, 4].map((gradePct) => {
+        const current = morningByBucket.get(gradePct) ?? [];
+        return {
+          gradePct,
+          dryKmh: Number((speedAtPower(dryWatts, gradePct / 100) * 3.6).toFixed(1)),
+          pushKmh: Number((speedAtPower(pushWatts, gradePct / 100) * 3.6).toFixed(1)),
+          currentKmh: current.length >= 20 ? Number((median(current) * 3.6).toFixed(1)) : null
+        };
+      });
+
+      const rideMinutes = (w: { segs: Array<{ dist: number; grade: number }> }, watts: number) =>
+        w.segs.reduce((s, seg) => s + seg.dist / speedAtPower(watts, Math.max(0.015, seg.grade)), 0) /
+        60;
+      const walkNow: number[] = [];
+      const dryRide: number[] = [];
+      const pushRide: number[] = [];
+      walkByTrip.forEach((w) => {
+        if (w.sec < 60) return;
+        walkNow.push(w.sec / 60);
+        dryRide.push(rideMinutes(w, dryWatts));
+        pushRide.push(rideMinutes(w, pushWatts));
+      });
+
+      pacing = {
+        massKg: MASS_KG,
+        comfortWatts: Number(comfortWatts.toFixed(0)),
+        flatKmh: Number((vFlat * 3.6).toFixed(1)),
+        targets,
+        morning:
+          walkNow.length >= 5
+            ? {
+                walkMinNow: Number(median(walkNow).toFixed(1)),
+                dryMin: Number(median(dryRide).toFixed(1)),
+                pushMin: Number(median(pushRide).toFixed(1))
+              }
+            : null
+      };
+    }
   }
 
-  return { bins, medianKmh, gradeSummary, climbs };
+  return { bins, medianKmh, gradeSummary, climbs, pacing };
 }
 
 export async function getInsights(): Promise<Insights> {

@@ -62,10 +62,26 @@ export interface ClimbSpot {
   months: ClimbMonth[];
 }
 
+export interface PacingTarget {
+  gradePct: number;
+  dryKmh: number;
+  pushKmh: number;
+  currentKmh: number | null;
+}
+
+export interface Pacing {
+  massKg: number;
+  comfortWatts: number;
+  flatKmh: number;
+  targets: PacingTarget[];
+  morning: { walkMinNow: number; dryMin: number; pushMin: number } | null;
+}
+
 export interface InsightsResponse {
   trips: Trip[];
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
+  pacing: Pacing | null;
 }
