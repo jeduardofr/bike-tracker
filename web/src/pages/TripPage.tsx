@@ -140,7 +140,7 @@ export default function TripPage() {
   const showGrade = mapMode === "grade" && gradeLines.length > 0;
 
   return (
-    <div className="container">
+    <div className="container wide">
       {error ? (
         <div className="loading">Trip not found</div>
       ) : data === null ? (
@@ -189,16 +189,18 @@ export default function TripPage() {
                 />
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                  gap: 12,
-                  flexWrap: "wrap"
-                }}
-              >
+              <div className="trip-grid">
+                <div className="trip-map-cell">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 8,
+                      gap: 12,
+                      flexWrap: "wrap"
+                    }}
+                  >
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     onClick={() => setMapMode("mode")}
@@ -244,13 +246,15 @@ export default function TripPage() {
                   )}
                 </div>
               </div>
-              <TripMap lines={showGrade ? gradeLines : mapLines} highlight={highlight} />
+                  <TripMap lines={showGrade ? gradeLines : mapLines} highlight={highlight} />
+                </div>
 
-              <SpeedChart points={points} hoverTs={hoverTs} onHoverTs={setHoverTs} />
+                <SpeedChart points={points} hoverTs={hoverTs} onHoverTs={setHoverTs} />
 
-              {elevPoints.length > 2 ? (
-                <ElevationChart entries={elevPoints} hoverTs={hoverTs} onHoverTs={setHoverTs} />
-              ) : null}
+                {elevPoints.length > 2 ? (
+                  <ElevationChart entries={elevPoints} hoverTs={hoverTs} onHoverTs={setHoverTs} />
+                ) : null}
+              </div>
 
               {splits.length > 0 ? (
                 <div className="card">

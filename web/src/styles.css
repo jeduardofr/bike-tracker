@@ -33,6 +33,60 @@ a {
   padding: 20px 16px 48px;
 }
 
+/* Trip detail uses the full desktop width */
+.container.wide {
+  max-width: 1560px;
+}
+
+/* 2x2 layout: map spans both rows on the left, charts stack on the right */
+.trip-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.trip-grid > * {
+  min-width: 0;
+}
+
+.trip-grid .trip-map-cell {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.trip-grid .trip-map-cell .map-wrap {
+  flex: 1;
+  min-height: 480px;
+  margin-bottom: 0;
+}
+
+.trip-grid .trip-map-cell .map-wrap .leaflet-container {
+  height: 100%;
+  min-height: 480px;
+}
+
+.trip-grid .card {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+  .trip-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .trip-grid .trip-map-cell {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .trip-grid .trip-map-cell .map-wrap,
+  .trip-grid .trip-map-cell .map-wrap .leaflet-container {
+    min-height: 320px;
+  }
+}
+
 .topbar {
   display: flex;
   align-items: baseline;
