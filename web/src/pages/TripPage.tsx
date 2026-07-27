@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import ElevationChart, { demClimb, type ElevPoint } from "../components/ElevationChart";
 import SpeedChart from "../components/SpeedChart";
 import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
@@ -58,6 +59,18 @@ export default function TripPage() {
   const metrics = useMemo(() => (points.length >= 2 ? computeMetrics(data!.points) : null), [data, points]);
   const splits = useMemo(() => computeSplits(points), [points]);
 
+  // accuracy-filtered points zipped with their DEM elevations
+  const elevPoints = useMemo<ElevPoint[]>(() => {
+    if (!data) return [];
+    const out: ElevPoint[] = [];
+    data.points.forEach((p, i) => {
+      const e = data.elevations?.[i];
+      if ((p.accuracy <= 50 || p.accuracy === 0) && e != null) out.push({ point: p, elev: e });
+    });
+    return out;
+  }, [data]);
+  const climb = useMemo(() => (elevPoints.length > 2 ? demClimb(elevPoints) : null), [elevPoints]);
+
   const mapLines: MapLine[] = useMemo(
     () =>
       buildSegments(points).map((seg) => ({
@@ -111,7 +124,11 @@ export default function TripPage() {
                   unit="km"
                 />
                 <StatTile label="Stopped" value={formatDuration(metrics.stoppedSeconds)} />
-                <StatTile label="Elevation gain" value={metrics.elevationGainMeters.toFixed(0)} unit="m" />
+                <StatTile
+                  label={climb !== null ? "Climb" : "Climb (GPS est.)"}
+                  value={(climb ?? metrics.elevationGainMeters).toFixed(0)}
+                  unit="m"
+                />
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -128,6 +145,8 @@ export default function TripPage() {
               <TripMap lines={mapLines} />
 
               <SpeedChart points={points} />
+
+              {elevPoints.length > 2 ? <ElevationChart entries={elevPoints} /> : null}
 
               {splits.length > 0 ? (
                 <div className="card">

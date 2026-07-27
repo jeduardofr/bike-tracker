@@ -27,6 +27,19 @@ export interface OverviewResponse {
 export interface TripResponse {
   trip: Trip;
   points: RoutePoint[];
+  /** DEM elevation (m) parallel to points; null where lookup failed */
+  elevations: Array<number | null>;
+}
+
+export interface GradeClass {
+  medianKmh: number;
+  minutes: number;
+}
+
+export interface GradeSummary {
+  uphill: GradeClass;
+  flat: GradeClass;
+  downhill: GradeClass;
 }
 
 /** [lat, lng, medianKmh] */
@@ -36,4 +49,5 @@ export interface InsightsResponse {
   trips: Trip[];
   bins: SpeedBin[];
   medianKmh: number;
+  gradeSummary: GradeSummary | null;
 }

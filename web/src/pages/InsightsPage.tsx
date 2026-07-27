@@ -3,7 +3,14 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import SpeedMap from "../components/SpeedMap";
 import StatTile from "../components/StatTile";
-import { TO_HOME_COLOR, TO_OFFICE_COLOR, UNIVERSITY_COLOR } from "../lib/colors";
+import {
+  FAST_COLOR,
+  NEUTRAL_COLOR,
+  SLOW_COLOR,
+  TO_HOME_COLOR,
+  TO_OFFICE_COLOR,
+  UNIVERSITY_COLOR
+} from "../lib/colors";
 import { tripCategory, tripLabel } from "../lib/category";
 import { addDays, formatDay, formatDuration, formatKm, isoDay, mondayOf } from "../lib/format";
 import type { InsightsResponse, Trip } from "../types";
@@ -504,6 +511,34 @@ export default function InsightsPage() {
           <WeeklyBars trips={trips} />
           {commutes.length > 0 ? <DurationScatter commutes={commutes} /> : null}
           {officeCommutes.length > 0 ? <WeekdayBars commutes={officeCommutes} /> : null}
+
+          {data.gradeSummary === null ? null : (
+            <div className="card">
+              <h2>Terrain vs speed</h2>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>
+                Median riding speed by grade, elevation from the DEM (walking excluded).
+              </div>
+              {(
+                [
+                  ["Climbs (>1.5%)", SLOW_COLOR, data.gradeSummary.uphill],
+                  ["Flat", NEUTRAL_COLOR, data.gradeSummary.flat],
+                  ["Descents (<-1.5%)", FAST_COLOR, data.gradeSummary.downhill]
+                ] as const
+              ).map(([label, color, g]) => (
+                <div
+                  key={label}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}
+                >
+                  <span style={{ width: 14, height: 4, borderRadius: 2, background: color }} />
+                  <span style={{ width: 140, fontSize: 13 }}>{label}</span>
+                  <strong style={{ width: 90 }}>{g.medianKmh.toFixed(1)} km/h</strong>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {formatDuration(g.minutes * 60)} of riding
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="card">
             <h2>Where you fly, where you crawl</h2>

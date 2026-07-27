@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { isAuthenticated, login, requireAuth } from "./auth.js";
 import { overviewForTrips, pointsForTrip, tripByUuid, tripsInRange } from "./db.js";
+import { elevationsFor } from "./elevation.js";
 import { getInsights } from "./insights.js";
 
 const app = new Hono();
@@ -49,7 +50,8 @@ app.get("/api/trip/:uuid", async (c) => {
   const trip = await tripByUuid(uuid);
   if (!trip) return c.json({ error: "not found" }, 404);
   const points = await pointsForTrip(uuid);
-  return c.json({ trip, points });
+  const elevations = await elevationsFor(points);
+  return c.json({ trip, points, elevations });
 });
 
 // Static SPA (production build)
