@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { tripLabel } from "../lib/category";
 import { weekdayColor } from "../lib/colors";
 import { formatDuration, formatKm, formatTime } from "../lib/format";
-import { RAINY_MM, type Trip, type TripWeather } from "../types";
+import { RAINY_MM, WINDY_KMH, type Trip, type TripWeather } from "../types";
 
 interface Props {
   trip: Trip;
@@ -21,7 +21,9 @@ export default function TripRowItem({ trip, weather }: Props) {
           {formatKm(trip.distanceMeters)} km
           {weather === undefined
             ? ""
-            : ` · ${weather.tempC.toFixed(0)}°C` + (weather.precipMm >= RAINY_MM ? " 🌧" : "")}
+            : ` · ${weather.tempC.toFixed(0)}°C` +
+              (weather.precipMm >= RAINY_MM ? " 🌧" : "") +
+              (weather.windKmh >= WINDY_KMH ? " 💨" : "")}
         </div>
       </span>
       <span className="speed">{trip.averageSpeedKmh.toFixed(1)} km/h</span>

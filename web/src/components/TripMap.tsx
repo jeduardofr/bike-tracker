@@ -12,9 +12,11 @@ interface Props {
   lines: MapLine[];
   /** position to spotlight (linked hover from the charts) */
   highlight?: [number, number] | null;
+  /** wind during the ride — rendered as a badge over the map */
+  wind?: { kmh: number; fromDeg: number } | null;
 }
 
-export default function TripMap({ lines, highlight }: Props) {
+export default function TripMap({ lines, highlight, wind }: Props) {
   const bounds = useMemo(() => {
     const b = new LatLngBounds([]);
     lines.forEach((line) => line.positions.forEach((p) => b.extend(p)));
@@ -50,6 +52,17 @@ export default function TripMap({ lines, highlight }: Props) {
           />
         )}
       </MapContainer>
+      {wind == null ? null : (
+        <div className="wind-badge" title={`wind from ${wind.fromDeg.toFixed(0)}°`}>
+          <span
+            className="wind-arrow"
+            style={{ transform: `rotate(${wind.fromDeg + 180}deg)` }}
+          >
+            ↑
+          </span>
+          {Math.round(wind.kmh)} km/h
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import StatTile from "../components/StatTile";
 import TripMap, { type MapLine } from "../components/TripMap";
 import { FAST_COLOR, NEUTRAL_COLOR, RIDE_COLOR, SLOW_COLOR, WALK_COLOR } from "../lib/colors";
 import { tripLabel } from "../lib/category";
-import { formatDay, formatDuration, formatKm, formatTime } from "../lib/format";
+import { formatDay, formatDuration, formatKm, formatTime, windCardinal } from "../lib/format";
 import { GRADE_WINDOW_M, gradeColor } from "../lib/grade";
 import {
   RIDING_THRESHOLD_MPS,
@@ -161,7 +161,8 @@ export default function TripPage() {
                   : ` · ${data.weather.tempC.toFixed(0)}°C` +
                     (data.weather.precipMm >= 0.2
                       ? ` · 🌧 ${data.weather.precipMm.toFixed(1)} mm/h`
-                      : "")}
+                      : "") +
+                    ` · 💨 ${Math.round(data.weather.windKmh)} km/h ${windCardinal(data.weather.windDirDeg)}`}
               </div>
             </div>
           </div>
@@ -252,7 +253,15 @@ export default function TripPage() {
                   )}
                 </div>
               </div>
-                  <TripMap lines={showGrade ? gradeLines : mapLines} highlight={highlight} />
+                  <TripMap
+                lines={showGrade ? gradeLines : mapLines}
+                highlight={highlight}
+                wind={
+                  data.weather === null
+                    ? null
+                    : { kmh: data.weather.windKmh, fromDeg: data.weather.windDirDeg }
+                }
+              />
                 </div>
 
                 <SpeedChart points={points} hoverTs={hoverTs} onHoverTs={setHoverTs} />

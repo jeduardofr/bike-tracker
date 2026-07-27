@@ -23,7 +23,11 @@ export interface TripWeather {
   precipMm: number;
   tempC: number;
   windKmh: number;
+  /** meteorological: degrees the wind blows FROM */
+  windDirDeg: number;
 }
+
+export const WINDY_KMH = 20;
 
 export const RAINY_MM = 0.2;
 

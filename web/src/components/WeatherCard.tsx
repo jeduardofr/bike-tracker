@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { tripCategory } from "../lib/category";
-import { RAINY_MM, type Trip, type TripWeather } from "../types";
+import { RAINY_MM, WINDY_KMH, type Trip, type TripWeather } from "../types";
 
 const durationMin = (t: Trip) => (t.endTime ? (t.endTime - t.startTime) / 60000 : 0);
 
@@ -30,12 +30,14 @@ export default function WeatherCard({ trips, weather }: Props) {
     const heavy = rainy.filter((t) => weather[t.uuid].precipMm >= 1);
     const cool = dry.filter((t) => weather[t.uuid].tempC < 26);
     const hot = dry.filter((t) => weather[t.uuid].tempC >= 29);
+    const windy = dry.filter((t) => weather[t.uuid].windKmh >= WINDY_KMH);
     return {
       dry: { n: dry.length, med: median(dry.map(durationMin)) },
       rainy: rainy.length >= 3 ? { n: rainy.length, med: median(rainy.map(durationMin)) } : null,
       heavy: heavy.length >= 2 ? { n: heavy.length, med: median(heavy.map(durationMin)) } : null,
       cool: cool.length >= 3 ? { n: cool.length, med: median(cool.map(durationMin)) } : null,
-      hot: hot.length >= 3 ? { n: hot.length, med: median(hot.map(durationMin)) } : null
+      hot: hot.length >= 3 ? { n: hot.length, med: median(hot.map(durationMin)) } : null,
+      windy: windy.length >= 3 ? { n: windy.length, med: median(windy.map(durationMin)) } : null
     };
   }, [trips, weather]);
 
@@ -60,6 +62,7 @@ export default function WeatherCard({ trips, weather }: Props) {
       {row("Heavy rain (≥1 mm/h)", stats.heavy)}
       {row("Dry & cool (<26°C)", stats.cool)}
       {row("Dry & hot (≥29°C)", stats.hot)}
+      {row(`Dry & windy (≥${WINDY_KMH} km/h)`, stats.windy)}
     </div>
   );
 }

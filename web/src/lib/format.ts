@@ -31,6 +31,11 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
+export function windCardinal(fromDeg: number): string {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return dirs[Math.round(((fromDeg % 360) + 360) % 360 / 45) % 8];
+}
+
 export function isoDay(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");

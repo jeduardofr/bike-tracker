@@ -5,12 +5,14 @@ import { db } from "./db.js";
 const LAT = 20.695;
 const LNG = -103.34;
 const TZ = "America%2FMexico_City";
-const HOURLY = "precipitation,temperature_2m,wind_speed_10m";
+const HOURLY = "precipitation,temperature_2m,wind_speed_10m,wind_direction_10m";
 
 export interface HourWeather {
   precipMm: number;
   tempC: number;
   windKmh: number;
+  /** meteorological: degrees the wind blows FROM */
+  windDirDeg: number;
 }
 
 const memory = new Map<string, HourWeather>();
@@ -29,12 +31,19 @@ async function ensureLoaded(): Promise<void> {
        wind_kmh REAL NOT NULL
      )`
   );
-  const rs = await db().execute(`SELECT hour, precip_mm, temp_c, wind_kmh FROM weather`);
+  // wind direction was added later; rows without it are treated as missing and refetched
+  await db()
+    .execute(`ALTER TABLE weather ADD COLUMN wind_dir REAL`)
+    .catch(() => undefined);
+  const rs = await db().execute(
+    `SELECT hour, precip_mm, temp_c, wind_kmh, wind_dir FROM weather WHERE wind_dir IS NOT NULL`
+  );
   rs.rows.forEach((r) =>
     memory.set(String(r.hour), {
       precipMm: Number(r.precip_mm),
       tempC: Number(r.temp_c),
-      windKmh: Number(r.wind_kmh)
+      windKmh: Number(r.wind_kmh),
+      windDirDeg: Number(r.wind_dir)
     })
   );
   loaded = true;
@@ -45,6 +54,7 @@ interface HourlyPayload {
   precipitation: Array<number | null>;
   temperature_2m: Array<number | null>;
   wind_speed_10m: Array<number | null>;
+  wind_direction_10m: Array<number | null>;
 }
 
 function collect(payload: HourlyPayload, into: Map<string, HourWeather>): void {
@@ -52,8 +62,9 @@ function collect(payload: HourlyPayload, into: Map<string, HourWeather>): void {
     const p = payload.precipitation[i];
     const tmp = payload.temperature_2m[i];
     const w = payload.wind_speed_10m[i];
-    if (p === null || tmp === null || w === null) return;
-    into.set(t.slice(0, 13), { precipMm: p, tempC: tmp, windKmh: w });
+    const d = payload.wind_direction_10m[i];
+    if (p === null || tmp === null || w === null || d === null) return;
+    into.set(t.slice(0, 13), { precipMm: p, tempC: tmp, windKmh: w, windDirDeg: d });
   });
 }
 
@@ -84,8 +95,8 @@ async function fetchMissing(keys: string[]): Promise<void> {
     if (w === undefined || memory.has(k)) continue;
     memory.set(k, w);
     rows.push({
-      sql: `INSERT OR REPLACE INTO weather (hour, precip_mm, temp_c, wind_kmh) VALUES (?, ?, ?, ?)`,
-      args: [k, w.precipMm, w.tempC, w.windKmh]
+      sql: `INSERT OR REPLACE INTO weather (hour, precip_mm, temp_c, wind_kmh, wind_dir) VALUES (?, ?, ?, ?, ?)`,
+      args: [k, w.precipMm, w.tempC, w.windKmh, w.windDirDeg]
     });
   }
   for (let i = 0; i < rows.length; i += 200) {
