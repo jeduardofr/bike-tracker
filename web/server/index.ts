@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { isAuthenticated, login, requireAuth } from "./auth.js";
 import { overviewForTrips, pointsForTrip, tripByUuid, tripsInRange } from "./db.js";
+import { ensureDem } from "./dem.js";
 import { elevationsFor } from "./elevation.js";
 import { getInsights } from "./insights.js";
 
@@ -62,3 +63,6 @@ const port = Number(process.env.PORT ?? 8787);
 serve({ fetch: app.fetch, port }, () => {
   console.log(`bike-tracker web listening on http://localhost:${port}`);
 });
+
+// warm the DEM in the background so the first elevation request doesn't pay for the download
+void ensureDem();

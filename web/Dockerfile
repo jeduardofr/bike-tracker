@@ -18,6 +18,9 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -g 1001 -S app && adduser -S app -u 1001
+# DEM tile volume mounts here; ownership is inherited on first volume creation
+RUN mkdir -p /data && chown app:app /data
+ENV DEM_PATH=/data/glo30_n20w104.tif
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 COPY server ./server

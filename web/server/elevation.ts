@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { ensureDem, sampleDem } from "./dem.js";
 
 // Terrain never changes: elevations are fetched from Open-Meteo (~90 m DEM)
 // once per ~55 m map bin, persisted in Turso, and mirrored in memory.
@@ -66,6 +67,11 @@ async function fetchMissing(bins: Array<[number, number]>): Promise<void> {
 export async function elevationsFor(
   points: Array<{ latitude: number; longitude: number }>
 ): Promise<Array<number | null>> {
+  // preferred source: local 30 m Copernicus DEM (per-point, no binning, no API)
+  if (await ensureDem()) {
+    return points.map((p) => sampleDem(p.latitude, p.longitude));
+  }
+  // fallback: Open-Meteo (~90 m) cached per bin in Turso
   try {
     await ensureLoaded();
     const missing = new Map<string, [number, number]>();
