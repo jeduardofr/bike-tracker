@@ -105,4 +105,5 @@ export interface InsightsResponse {
   climbs: ClimbSpot[];
   pacing: Pacing | null;
   tripWeather: Record<string, TripWeather>;
+  climbTotalM: number | null;
 }

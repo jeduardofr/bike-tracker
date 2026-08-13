@@ -22,6 +22,40 @@ const W = 860;
 
 const durationMin = (t: Trip) => (t.endTime ? (t.endTime - t.startTime) / 60000 : 0);
 
+const MOUNTAINS: Array<[string, number]> = [
+  ["Mont Blanc", 4808],
+  ["Pico de Orizaba", 5636],
+  ["Kilimanjaro", 5895],
+  ["Denali", 6190],
+  ["Aconcagua", 6961],
+  ["K2", 8611],
+  ["Everest", 8849]
+];
+
+function nextMountain(totalM: number): string {
+  const next = MOUNTAINS.find(([, m]) => m > totalM);
+  return next === null || next === undefined
+    ? "every summit climbed 🏔"
+    : `next: ${next[0]} in ${(next[1] - totalM).toFixed(0)} m`;
+}
+
+/** Mondays of weeks with office commutes -> set of weekdays (0-4) ridden */
+function commuteWeeks(trips: Trip[]): Map<string, Set<number>> {
+  const weeks = new Map<string, Set<number>>();
+  trips.forEach((t) => {
+    if (t.direction === "FREE" || tripCategory(t) !== "office") return;
+    const d = new Date(t.startTime);
+    const wd = (d.getDay() + 6) % 7; // Mon=0
+    if (wd > 4) return;
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - wd);
+    const key = isoDay(monday);
+    const set = weeks.get(key) ?? new Set<number>();
+    set.add(wd);
+    weeks.set(key, set);
+  });
+  return weeks;
+}
+
 // ---------- weekly distance bars ----------
 
 function barPath(x: number, y: number, w: number, h: number, r: number): string {
@@ -446,6 +480,19 @@ export default function InsightsPage() {
     return { distance, duration, count: trips.length, activeDays: activeDays.size, streak: best };
   }, [trips]);
 
+  const milestones = useMemo(() => {
+    const weeks = commuteWeeks(trips);
+    let perfect = 0;
+    weeks.forEach((s) => {
+      if (s.size === 5) perfect++;
+    });
+    const now = new Date();
+    const wd = (now.getDay() + 6) % 7;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - Math.min(wd, 4));
+    const thisWeek = weeks.get(isoDay(monday))?.size ?? 0;
+    return { perfect, totalWeeks: weeks.size, thisWeek };
+  }, [trips]);
+
   return (
     <div className="container">
       <div className="topbar">
@@ -468,6 +515,17 @@ export default function InsightsPage() {
             <StatTile label="Active days" value={String(lifetime.activeDays)} />
             <StatTile label="Best commute-day streak" value={String(lifetime.streak)} unit="days" />
             <StatTile label="University rides" value={String(universityRides.length)} />
+            {data.climbTotalM == null ? null : (
+              <StatTile
+                label={`⛰ Lifetime climb · ${nextMountain(data.climbTotalM)}`}
+                value={data.climbTotalM.toLocaleString()}
+                unit="m"
+              />
+            )}
+            <StatTile
+              label={`★ Perfect weeks (5/5) · this week ${milestones.thisWeek}/5`}
+              value={`${milestones.perfect} of ${milestones.totalWeeks}`}
+            />
           </div>
 
           <div className="tiles">

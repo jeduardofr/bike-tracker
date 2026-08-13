@@ -55,6 +55,8 @@ export interface Insights {
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
   pacing: Pacing | null;
+  /** lifetime DEM climb across all trips, meters */
+  climbTotalM: number | null;
 }
 
 const BIN_DEG = 0.00025; // ~27 m
@@ -139,6 +141,7 @@ async function buildTerrain(): Promise<{
   gradeSummary: GradeSummary | null;
   climbs: ClimbSpot[];
   pacing: Pacing | null;
+  climbTotalM: number | null;
 }> {
   const rs = await db().execute(
     `SELECT trip_uuid, latitude, longitude, speed_mps, timestamp, accuracy
@@ -180,10 +183,36 @@ async function buildTerrain(): Promise<{
   let gradeSummary: GradeSummary | null = null;
   let climbs: ClimbSpot[] = [];
   let pacing: Pacing | null = null;
+  let climbTotalM: number | null = null;
   const elevations = await elevationsFor(
     points.map((p) => ({ latitude: p.lat, longitude: p.lng }))
   );
   if (elevations.some((e) => e !== null)) {
+    // lifetime climb: per-trip elevation gain with 3 m hysteresis, summed
+    {
+      let total = 0;
+      let lastE: number | null = null;
+      let curTrip = "";
+      for (let i = 0; i < points.length; i++) {
+        const e = elevations[i];
+        if (points[i].trip !== curTrip) {
+          curTrip = points[i].trip;
+          lastE = e;
+          continue;
+        }
+        if (e === null) continue;
+        if (lastE === null) {
+          lastE = e;
+          continue;
+        }
+        const d = e - lastE;
+        if (Math.abs(d) >= 3) {
+          if (d > 0) total += d;
+          lastE = e;
+        }
+      }
+      climbTotalM = Number(total.toFixed(0));
+    }
     const speedsBy: Record<string, number[]> = { uphill: [], flat: [], downhill: [] };
     const secondsBy: Record<string, number> = { uphill: 0, flat: 0, downhill: 0 };
     const commuteDir = await tripDirections();
@@ -401,7 +430,7 @@ async function buildTerrain(): Promise<{
     }
   }
 
-  return { bins, medianKmh, gradeSummary, climbs, pacing };
+  return { bins, medianKmh, gradeSummary, climbs, pacing, climbTotalM };
 }
 
 export async function getInsights(): Promise<Insights> {
