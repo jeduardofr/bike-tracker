@@ -466,6 +466,7 @@ export default function InsightsPage() {
     let best = 0;
     if (trips.length > 0) {
       const first = new Date(Math.min(...trips.map((t) => t.startTime)));
+      first.setHours(0, 0, 0, 0); // count whole days — today's ride counts from midnight
       for (let d = new Date(first); d <= new Date(); d = addDays(d, 1)) {
         const weekday = d.getDay() >= 1 && d.getDay() <= 5;
         if (!weekday) continue;
