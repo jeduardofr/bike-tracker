@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
+import { CircleMarker, MapContainer, Tooltip } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
+import BasemapTiles from "./BasemapTiles";
 import { FAST_COLOR, NEUTRAL_COLOR, SLOW_COLOR, speedRampColor } from "../lib/colors";
 import type { SpeedBin } from "../types";
 
@@ -37,10 +38,7 @@ export default function SpeedMap({ bins, medianKmh }: Props) {
       </div>
       <div className="map-wrap">
         <MapContainer bounds={bounds} scrollWheelZoom={true} preferCanvas={true}>
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          />
+          <BasemapTiles />
           {bins.map(([lat, lng, kmh], i) => (
             <CircleMarker
               key={i}

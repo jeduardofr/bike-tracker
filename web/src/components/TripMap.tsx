@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { CircleMarker, MapContainer, Polyline, TileLayer } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
+import BasemapTiles from "./BasemapTiles";
 
 export interface MapLine {
   positions: [number, number][];
@@ -28,10 +29,7 @@ export default function TripMap({ lines, highlight, wind }: Props) {
   ) : (
     <div className="map-wrap">
       <MapContainer bounds={bounds} scrollWheelZoom={true} preferCanvas={true}>
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        />
+        <BasemapTiles />
         {lines.map((line, i) => (
           <Polyline
             key={i}

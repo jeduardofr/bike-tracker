@@ -18,6 +18,7 @@ async function get<T>(path: string): Promise<T> {
 
 export const api = {
   me: () => get<{ authenticated: boolean }>("/api/me"),
+  config: () => get<{ cartoApiKey: string | null }>("/api/config"),
   login: async (password: string): Promise<boolean> => {
     const res = await fetch("/api/login", {
       method: "POST",

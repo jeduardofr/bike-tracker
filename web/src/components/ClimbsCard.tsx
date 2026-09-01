@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
+import { CircleMarker, MapContainer, Tooltip } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
+import BasemapTiles from "./BasemapTiles";
 import { NEUTRAL_COLOR, RIDE_COLOR, SLOW_COLOR } from "../lib/colors";
 import type { ClimbSpot } from "../types";
 
@@ -55,10 +56,7 @@ export default function ClimbsCard({ climbs }: { climbs: ClimbSpot[] }) {
       </div>
       <div className="map-wrap short" style={{ marginBottom: 12 }}>
         <MapContainer bounds={bounds} scrollWheelZoom={true} preferCanvas={true}>
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          />
+          <BasemapTiles />
           {climbs.map((c, i) => (
             <CircleMarker
               key={i}

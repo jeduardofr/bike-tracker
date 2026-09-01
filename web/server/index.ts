@@ -32,6 +32,9 @@ app.get("/api/me", (c) => c.json({ authenticated: isAuthenticated(c) }));
 
 app.use("/api/*", requireAuth);
 
+// runtime config for the SPA (only after login — keeps keys out of the bundle)
+app.get("/api/config", (c) => c.json({ cartoApiKey: process.env.CARTO_API_KEY ?? null }));
+
 function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
   const from = Number(c.req.query("from"));
   const to = Number(c.req.query("to"));
