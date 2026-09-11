@@ -468,9 +468,18 @@ export default function InsightsPage() {
       const first = new Date(Math.min(...trips.map((t) => t.startTime)));
       first.setHours(0, 0, 0, 0); // count whole days — today's ride counts from midnight
       for (let d = new Date(first); d <= new Date(); d = addDays(d, 1)) {
-        const weekday = d.getDay() >= 1 && d.getDay() <= 5;
-        if (!weekday) continue;
-        if (activeDays.has(isoDay(d))) {
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) continue;
+        const rode = activeDays.has(isoDay(d));
+        if (dow === 5) {
+          // Fridays are WFH: optional — a ride extends the streak, a skip never breaks it
+          if (rode) {
+            streak++;
+            best = Math.max(best, streak);
+          }
+          continue;
+        }
+        if (rode) {
           streak++;
           best = Math.max(best, streak);
         } else {
@@ -485,12 +494,14 @@ export default function InsightsPage() {
     const weeks = commuteWeeks(trips);
     let perfect = 0;
     weeks.forEach((s) => {
-      if (s.size === 5) perfect++;
+      // Fridays are WFH — a perfect week is Mon–Thu ridden
+      if ([0, 1, 2, 3].every((d) => s.has(d))) perfect++;
     });
     const now = new Date();
     const wd = (now.getDay() + 6) % 7;
     const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - Math.min(wd, 4));
-    const thisWeek = weeks.get(isoDay(monday))?.size ?? 0;
+    const thisSet = weeks.get(isoDay(monday));
+    const thisWeek = thisSet === undefined ? 0 : [0, 1, 2, 3].filter((d) => thisSet.has(d)).length;
     return { perfect, totalWeeks: weeks.size, thisWeek };
   }, [trips]);
 
@@ -514,7 +525,7 @@ export default function InsightsPage() {
             <StatTile label="Time on the bike" value={formatDuration(lifetime.duration)} />
             <StatTile label="Trips" value={String(lifetime.count)} />
             <StatTile label="Active days" value={String(lifetime.activeDays)} />
-            <StatTile label="Best commute-day streak" value={String(lifetime.streak)} unit="days" />
+            <StatTile label="Best commute streak · Fridays optional" value={String(lifetime.streak)} unit="days" />
             <StatTile label="University rides" value={String(universityRides.length)} />
             {data.climbTotalM == null ? null : (
               <StatTile
@@ -524,7 +535,7 @@ export default function InsightsPage() {
               />
             )}
             <StatTile
-              label={`★ Perfect weeks (5/5) · this week ${milestones.thisWeek}/5`}
+              label={`★ Perfect weeks (Mon–Thu) · this week ${milestones.thisWeek}/4`}
               value={`${milestones.perfect} of ${milestones.totalWeeks}`}
             />
           </div>
