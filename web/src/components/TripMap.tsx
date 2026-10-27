@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { CircleMarker, MapContainer, Polyline } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
 import BasemapTiles from "./BasemapTiles";
+import { SignalsLayer, SignalsToggle, signalsNear, useSignals } from "./SignalsLayer";
 
 export interface MapLine {
   positions: [number, number][];
@@ -18,6 +19,11 @@ interface Props {
 }
 
 export default function TripMap({ lines, highlight, wind }: Props) {
+  const signals = useSignals();
+  const onRoute = useMemo(
+    () => signalsNear(signals.signals, lines.flatMap((l) => l.positions)),
+    [signals.signals, lines]
+  );
   const bounds = useMemo(() => {
     const b = new LatLngBounds([]);
     lines.forEach((line) => line.positions.forEach((p) => b.extend(p)));
@@ -42,6 +48,7 @@ export default function TripMap({ lines, highlight, wind }: Props) {
             }}
           />
         ))}
+        {signals.visible ? <SignalsLayer signals={onRoute} /> : null}
         {highlight == null ? null : (
           <CircleMarker
             center={highlight}
@@ -50,6 +57,11 @@ export default function TripMap({ lines, highlight, wind }: Props) {
           />
         )}
       </MapContainer>
+      <SignalsToggle
+        visible={signals.visible}
+        count={onRoute.length}
+        onToggle={signals.toggle}
+      />
       {wind == null ? null : (
         <div className="wind-badge" title={`wind from ${wind.fromDeg.toFixed(0)}°`}>
           <span

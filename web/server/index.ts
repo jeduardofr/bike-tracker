@@ -6,6 +6,7 @@ import { overviewForTrips, pointsForTrip, tripByUuid, tripsBefore, tripsInRange 
 import { ensureDem } from "./dem.js";
 import { elevationsFor } from "./elevation.js";
 import { getInsights } from "./insights.js";
+import { trafficSignals } from "./signals.js";
 import { weatherAt } from "./weather.js";
 import type { TripRow } from "./db.js";
 
@@ -71,6 +72,8 @@ app.get("/api/insights", async (c) => {
   const insights = await getInsights();
   return c.json({ ...insights, tripWeather: await weatherMap(insights.trips) });
 });
+
+app.get("/api/signals", async (c) => c.json({ signals: await trafficSignals() }));
 
 app.get("/api/trip/:uuid", async (c) => {
   const uuid = c.req.param("uuid");

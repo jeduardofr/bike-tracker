@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { CircleMarker, MapContainer, Tooltip } from "react-leaflet";
 import { LatLngBounds } from "leaflet";
 import BasemapTiles from "./BasemapTiles";
+import { SignalsLayer, SignalsToggle, signalsNear, useSignals } from "./SignalsLayer";
 import { FAST_COLOR, NEUTRAL_COLOR, SLOW_COLOR, speedRampColor } from "../lib/colors";
 import type { SpeedBin } from "../types";
 
@@ -11,6 +12,11 @@ interface Props {
 }
 
 export default function SpeedMap({ bins, medianKmh }: Props) {
+  const signals = useSignals();
+  const onRoute = useMemo(
+    () => signalsNear(signals.signals, bins.map(([lat, lng]) => [lat, lng] as [number, number])),
+    [signals.signals, bins]
+  );
   const bounds = useMemo(() => {
     const b = new LatLngBounds([]);
     bins.forEach(([lat, lng]) => b.extend([lat, lng]));
@@ -54,7 +60,13 @@ export default function SpeedMap({ bins, medianKmh }: Props) {
               <Tooltip>{kmh.toFixed(1)} km/h (median here)</Tooltip>
             </CircleMarker>
           ))}
+          {signals.visible ? <SignalsLayer signals={onRoute} /> : null}
         </MapContainer>
+        <SignalsToggle
+          visible={signals.visible}
+          count={onRoute.length}
+          onToggle={signals.toggle}
+        />
       </div>
     </>
   );

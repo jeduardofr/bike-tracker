@@ -200,6 +200,35 @@ button:hover,
   pointer-events: none;
 }
 
+.signals-toggle {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.signals-toggle.on {
+  color: var(--text);
+}
+
+.signals-toggle .signals-ring {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+
 .wind-badge .wind-arrow {
   display: inline-block;
   font-size: 14px;

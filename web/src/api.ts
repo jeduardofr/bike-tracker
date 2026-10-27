@@ -30,6 +30,7 @@ export const api = {
   },
   overview: (from: number, to: number) =>
     get<OverviewResponse>(`/api/overview?from=${from}&to=${to}`),
+  signals: () => get<{ signals: [number, number][] }>("/api/signals"),
   insights: () => get<InsightsResponse>("/api/insights"),
   history: (before?: number, limit = 20) =>
     get<HistoryResponse>(
