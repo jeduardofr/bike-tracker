@@ -94,5 +94,8 @@ serve({ fetch: app.fetch, port }, () => {
   console.log(`bike-tracker web listening on http://localhost:${port}`);
 });
 
-// warm the DEM in the background so the first elevation request doesn't pay for the download
-void ensureDem();
+// warm the DEM in the background so the first elevation request doesn't pay for the download,
+// then the insights point cache so the first visit after a deploy doesn't pay for the full load
+void ensureDem().then(() =>
+  getInsights().catch((e) => console.warn("insights warm-up failed:", e))
+);

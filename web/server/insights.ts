@@ -65,9 +65,17 @@ const MAX_ACCURACY_M = 50;
 const RIDING_MPS = 1.94;
 const GRADE_WINDOW_M = 80; // grade measured over a rolling ≥80 m stretch
 const GRADE_CUTOFF = 0.015; // ±1.5% separates uphill/flat/downhill
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const PAGE_ROWS = 25_000; // first load is paged so no single response carries every point
 
-let cache: { at: number; data: Insights } | null = null;
+// Route points only change when the phone syncs a ride, so they're kept in memory per trip
+// and only new/re-synced trips are fetched. The sync always deletes and re-inserts a trip's
+// points, so any trip owning a row above the last seen id is refetched whole.
+const pointsByTrip = new Map<string, Pt[]>();
+let lastPointId = -1;
+// computed terrain, reused until the points or trips change
+let terrainCache: { signature: string; data: Awaited<ReturnType<typeof buildTerrain>> } | null =
+  null;
+let inFlight: Promise<Insights> | null = null;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -135,7 +143,74 @@ function speedAtPower(watts: number, grade: number): number {
   return (lo + hi) / 2;
 }
 
-async function buildTerrain(): Promise<{
+function toPt(row: Record<string, unknown>): Pt | null {
+  const accuracy = Number(row.accuracy);
+  if (accuracy > MAX_ACCURACY_M && accuracy !== 0) return null;
+  return {
+    trip: String(row.trip_uuid),
+    lat: Number(row.latitude),
+    lng: Number(row.longitude),
+    speed: Number(row.speed_mps),
+    ts: Number(row.timestamp)
+  };
+}
+
+const POINT_COLUMNS = "id, trip_uuid, latitude, longitude, speed_mps, timestamp, accuracy";
+
+function group(rows: Array<Record<string, unknown>>, into: Map<string, Pt[]>): void {
+  for (const row of rows) {
+    const p = toPt(row);
+    if (p === null) continue;
+    const list = into.get(p.trip) ?? [];
+    list.push(p);
+    into.set(p.trip, list);
+  }
+}
+
+/** Bring the in-memory points up to `maxId`, fetching only what changed. */
+async function syncPoints(maxId: number, tripUuids: Set<string>): Promise<void> {
+  if (lastPointId < 0) {
+    const fresh = new Map<string, Pt[]>();
+    let after = -1;
+    for (;;) {
+      const rs = await db().execute({
+        sql: `SELECT ${POINT_COLUMNS} FROM route_points WHERE id > ? ORDER BY id LIMIT ?`,
+        args: [after, PAGE_ROWS]
+      });
+      if (rs.rows.length === 0) break;
+      group(rs.rows, fresh);
+      after = Number(rs.rows[rs.rows.length - 1].id);
+      if (rs.rows.length < PAGE_ROWS) break;
+    }
+    fresh.forEach((pts, trip) => pointsByTrip.set(trip, pts));
+  } else if (maxId > lastPointId) {
+    const touched = await db().execute({
+      sql: `SELECT DISTINCT trip_uuid FROM route_points WHERE id > ?`,
+      args: [lastPointId]
+    });
+    for (const r of touched.rows) {
+      const trip = String(r.trip_uuid);
+      const rs = await db().execute({
+        sql: `SELECT ${POINT_COLUMNS} FROM route_points WHERE trip_uuid = ?`,
+        args: [trip]
+      });
+      const fresh = new Map<string, Pt[]>();
+      group(rs.rows, fresh);
+      pointsByTrip.set(trip, fresh.get(trip) ?? []);
+    }
+  }
+  pointsByTrip.forEach((pts, trip) => {
+    if (!tripUuids.has(trip)) pointsByTrip.delete(trip); // deleted on the phone
+    else pts.sort((a, b) => a.ts - b.ts);
+  });
+  lastPointId = maxId;
+}
+
+function allPoints(): Pt[] {
+  return [...pointsByTrip.keys()].sort().flatMap((trip) => pointsByTrip.get(trip)!);
+}
+
+async function buildTerrain(points: Pt[]): Promise<{
   bins: SpeedBin[];
   medianKmh: number;
   gradeSummary: GradeSummary | null;
@@ -143,24 +218,8 @@ async function buildTerrain(): Promise<{
   pacing: Pacing | null;
   climbTotalM: number | null;
 }> {
-  const rs = await db().execute(
-    `SELECT trip_uuid, latitude, longitude, speed_mps, timestamp, accuracy
-     FROM route_points ORDER BY trip_uuid, timestamp`
-  );
-
-  const points: Pt[] = [];
   const byBin = new Map<string, number[]>();
-  for (const row of rs.rows) {
-    const accuracy = Number(row.accuracy);
-    if (accuracy > MAX_ACCURACY_M && accuracy !== 0) continue;
-    const p: Pt = {
-      trip: String(row.trip_uuid),
-      lat: Number(row.latitude),
-      lng: Number(row.longitude),
-      speed: Number(row.speed_mps),
-      ts: Number(row.timestamp)
-    };
-    points.push(p);
+  for (const p of points) {
     const key = `${Math.round(p.lat / BIN_DEG)},${Math.round(p.lng / BIN_DEG)}`;
     const list = byBin.get(key) ?? [];
     list.push(p.speed * 3.6);
@@ -433,14 +492,34 @@ async function buildTerrain(): Promise<{
   return { bins, medianKmh, gradeSummary, climbs, pacing, climbTotalM };
 }
 
-export async function getInsights(): Promise<Insights> {
-  if (cache !== null && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
-  const [trips, terrain] = await Promise.all([
+async function loadInsights(): Promise<Insights> {
+  const [trips, state] = await Promise.all([
     tripsInRange(0, Date.now() + 24 * 3600 * 1000),
-    buildTerrain()
+    db().batch(
+      [
+        "SELECT max(id) AS max_id FROM route_points",
+        "SELECT uuid, direction, distance_meters, end_time, is_completed FROM trips ORDER BY uuid"
+      ],
+      "read"
+    )
   ]);
-  const data: Insights = { trips, ...terrain };
-  // don't pin a failed elevation lookup for the full TTL
-  if (terrain.gradeSummary !== null) cache = { at: Date.now(), data };
-  return data;
+  const maxId = Number(state[0].rows[0].max_id ?? 0);
+  const tripRows = state[1].rows;
+  const signature = `${maxId}|${JSON.stringify(tripRows)}`;
+  if (terrainCache?.signature !== signature) {
+    await syncPoints(maxId, new Set(tripRows.map((r) => String(r.uuid))));
+    const terrain = await buildTerrain(allPoints());
+    // don't pin a failed elevation lookup — retry it on the next request
+    terrainCache = terrain.gradeSummary !== null ? { signature, data: terrain } : null;
+    return { trips, ...terrain };
+  }
+  return { trips, ...terrainCache.data };
+}
+
+export function getInsights(): Promise<Insights> {
+  // concurrent visitors share one load instead of each pulling the points
+  inFlight ??= loadInsights().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
 }
