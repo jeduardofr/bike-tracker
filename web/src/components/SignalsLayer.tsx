@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { CircleMarker } from "react-leaflet";
+import { CircleMarker, Marker } from "react-leaflet";
+import { divIcon } from "leaflet";
 import { api } from "../api";
+import type { Signal } from "../types";
 
-// Traffic signals (OpenStreetMap) as a reference overlay: hollow rings so they read as
+// Traffic signals (OpenStreetMap) as a reference overlay: outlined marks so they read as
 // map furniture, distinct by shape from the filled route/speed marks underneath.
+// Junction lights are rings; stand-alone pedestrian crossing lights are diamonds.
 const RING_COLOR = "#E6E8EB";
 const STORAGE_KEY = "bike.showSignals";
 // a signal counts as "on the route" within this distance of any drawn point
@@ -11,8 +14,12 @@ const NEAR_METERS = 30;
 const M_PER_LAT = 111_000;
 const M_PER_LNG = 111_000 * Math.cos((20.69 * Math.PI) / 180);
 
-let cached: Promise<[number, number][]> | null = null;
-function loadSignals(): Promise<[number, number][]> {
+// the diamond is an inner span: rotating the icon itself would also rotate Leaflet's
+// positioning transform and fling the marker off its spot
+const PEDESTRIAN_ICON = divIcon({ className: "ped-signal", html: "<span></span>", iconSize: [8, 8] });
+
+let cached: Promise<Signal[]> | null = null;
+function loadSignals(): Promise<Signal[]> {
   cached ??= api
     .signals()
     .then((r) => r.signals)
@@ -32,7 +39,7 @@ function storedVisible(): boolean {
 }
 
 /** Signals within NEAR_METERS of any of the given points (grid-hashed). */
-export function signalsNear(signals: [number, number][], points: [number, number][]) {
+export function signalsNear(signals: Signal[], points: [number, number][]) {
   const cell = (lat: number, lng: number) =>
     `${Math.floor((lat * M_PER_LAT) / NEAR_METERS)},${Math.floor((lng * M_PER_LNG) / NEAR_METERS)}`;
   const grid = new Set(points.map(([lat, lng]) => cell(lat, lng)));
@@ -47,7 +54,7 @@ export function signalsNear(signals: [number, number][], points: [number, number
 
 /** Shared on/off state for the overlay, remembered per browser. */
 export function useSignals() {
-  const [signals, setSignals] = useState<[number, number][]>([]);
+  const [signals, setSignals] = useState<Signal[]>([]);
   const [visible, setVisible] = useState(storedVisible);
   useEffect(() => {
     let cancelled = false;
@@ -70,41 +77,54 @@ export function useSignals() {
   return { signals, visible, toggle };
 }
 
-export function SignalsLayer({ signals }: { signals: [number, number][] }) {
+export function SignalsLayer({ signals }: { signals: Signal[] }) {
   return (
     <>
-      {signals.map((p, i) => (
-        <CircleMarker
-          key={i}
-          center={p}
-          radius={3.5}
-          interactive={false}
-          pathOptions={{ color: RING_COLOR, weight: 1.5, opacity: 0.85, fill: false }}
-        />
-      ))}
+      {signals.map(([lat, lng, kind], i) =>
+        kind === 1 ? (
+          <Marker key={i} position={[lat, lng]} icon={PEDESTRIAN_ICON} interactive={false} />
+        ) : (
+          <CircleMarker
+            key={i}
+            center={[lat, lng]}
+            radius={3.5}
+            interactive={false}
+            pathOptions={{ color: RING_COLOR, weight: 1.5, opacity: 0.85, fill: false }}
+          />
+        )
+      )}
     </>
   );
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 export function SignalsToggle({
   visible,
-  count,
+  signals,
   onToggle
 }: {
   visible: boolean;
-  count: number;
+  signals: Signal[];
   onToggle: () => void;
 }) {
+  const crossings = signals.filter((s) => s[2] === 1).length;
   return (
     <button
       type="button"
       className={`signals-toggle${visible ? " on" : ""}`}
       onClick={onToggle}
       aria-pressed={visible}
-      title="Traffic signals on these roads (OpenStreetMap)"
+      title="Traffic lights on these roads (OpenStreetMap): junctions and pedestrian crossings"
     >
       <span className="signals-ring" />
-      {count} signals
+      {plural(signals.length - crossings, "junction")}
+      {crossings > 0 ? (
+        <>
+          <span className="signals-diamond" />
+          {plural(crossings, "crossing")}
+        </>
+      ) : null}
     </button>
   );
 }

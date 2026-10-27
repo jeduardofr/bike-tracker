@@ -64,7 +64,7 @@ export default function SpeedMap({ bins, medianKmh }: Props) {
         </MapContainer>
         <SignalsToggle
           visible={signals.visible}
-          count={onRoute.length}
+          signals={onRoute}
           onToggle={signals.toggle}
         />
       </div>

@@ -107,3 +107,6 @@ export interface InsightsResponse {
   tripWeather: Record<string, TripWeather>;
   climbTotalM: number | null;
 }
+
+/** Traffic light from OpenStreetMap: kind 0 = junction, 1 = mid-block pedestrian crossing */
+export type Signal = [lat: number, lng: number, kind: 0 | 1];

@@ -1,4 +1,10 @@
-import type { HistoryResponse, InsightsResponse, OverviewResponse, TripResponse } from "./types";
+import type {
+  HistoryResponse,
+  InsightsResponse,
+  OverviewResponse,
+  Signal,
+  TripResponse
+} from "./types";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -30,7 +36,7 @@ export const api = {
   },
   overview: (from: number, to: number) =>
     get<OverviewResponse>(`/api/overview?from=${from}&to=${to}`),
-  signals: () => get<{ signals: [number, number][] }>("/api/signals"),
+  signals: () => get<{ signals: Signal[] }>("/api/signals"),
   insights: () => get<InsightsResponse>("/api/insights"),
   history: (before?: number, limit = 20) =>
     get<HistoryResponse>(

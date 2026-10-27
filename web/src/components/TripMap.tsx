@@ -59,7 +59,7 @@ export default function TripMap({ lines, highlight, wind }: Props) {
       </MapContainer>
       <SignalsToggle
         visible={signals.visible}
-        count={onRoute.length}
+        signals={onRoute}
         onToggle={signals.toggle}
       />
       {wind == null ? null : (
