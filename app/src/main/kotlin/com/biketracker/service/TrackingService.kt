@@ -28,6 +28,12 @@ class TrackingService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Database writes (each point, then closing the trip) run here, in order, and are never
+    // cancelled: serviceScope dies in onDestroy, which runs right after stopSelf() and used to kill
+    // the closing write before it ran, leaving the trip open until something closed it hours later.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private var stopping = false
     private var currentTripId: Long = -1
     private var tripStartTime: Long = 0L
     private val collectedPoints = mutableListOf<RoutePoint>()
@@ -62,7 +68,7 @@ class TrackingService : Service() {
                         accuracy = location.accuracy
                     )
                     collectedPoints.add(point)
-                    serviceScope.launch {
+                    writeScope.launch {
                         if (currentTripId != -1L) {
                             tripRepository.addRoutePoint(currentTripId, point)
                         }
@@ -92,6 +98,7 @@ class TrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                stopping = false
                 currentTripId = intent.getLongExtra(EXTRA_TRIP_ID, -1L)
                 tripStartTime = System.currentTimeMillis()
                 collectedPoints.clear()
@@ -157,14 +164,16 @@ class TrackingService : Service() {
     }
 
     private fun stopTracking() {
+        if (stopping) return // auto-stop fires on every fix inside the radius until updates stop
+        stopping = true
         fusedLocationClient.removeLocationUpdates(locationCallback)
         trackingStateHolder.emit(TrackingState.Idle)
-        serviceScope.launch {
-            withContext(NonCancellable) {
-                if (currentTripId != -1L) {
-                    stopTripUseCase(currentTripId)
-                }
-            }
+        val tripId = currentTripId
+        writeScope.launch {
+            // after the queued point writes; if the service was restarted it no longer knows the
+            // trip, so close whichever one is still open
+            val id = if (tripId != -1L) tripId else tripRepository.getActiveTrip().firstOrNull()?.id
+            if (id != null) stopTripUseCase(id)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

@@ -18,4 +18,8 @@ interface RoutePointDao {
 
     @Query("SELECT * FROM route_points WHERE tripId = :tripId ORDER BY timestamp ASC")
     suspend fun getPointsForTripOnce(tripId: Long): List<RoutePointEntity>
+
+    /** When the trip's last GPS fix was taken: its real end, whenever the trip is closed. */
+    @Query("SELECT MAX(timestamp) FROM route_points WHERE tripId = :tripId")
+    suspend fun lastTimestamp(tripId: Long): Long?
 }

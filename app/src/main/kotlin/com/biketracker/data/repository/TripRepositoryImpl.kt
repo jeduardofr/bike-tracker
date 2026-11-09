@@ -35,15 +35,43 @@ class TripRepositoryImpl @Inject constructor(
 
     override suspend fun stopTrip(tripId: Long, distanceMeters: Float, averageSpeedKmh: Float) {
         val trip = tripDao.getTripById(tripId) ?: return
+        // the last fix, not "now": a trip closed late (a stop that didn't save, a stuck trip ended
+        // by the next one) must not stretch to the moment it was finally closed
+        val end = routePointDao.lastTimestamp(tripId) ?: System.currentTimeMillis()
         tripDao.updateTrip(
             trip.copy(
-                endTime = System.currentTimeMillis(),
+                endTime = end,
                 distanceMeters = distanceMeters,
                 averageSpeedKmh = averageSpeedKmh,
-                isCompleted = true
+                isCompleted = true,
+                syncedAt = null
             )
         )
         syncScheduler.syncNow()
+    }
+
+    override suspend fun updateMetrics(tripId: Long, distanceMeters: Float, averageSpeedKmh: Float) {
+        val trip = tripDao.getTripById(tripId) ?: return
+        tripDao.updateTrip(trip.copy(distanceMeters = distanceMeters, averageSpeedKmh = averageSpeedKmh, syncedAt = null))
+        syncScheduler.syncNow()
+    }
+
+    override suspend fun repairEndTimes(): Int {
+        var fixed = 0
+        for (trip in tripDao.getCompletedTrips()) {
+            val end = trip.endTime ?: continue
+            val last = routePointDao.lastTimestamp(trip.id) ?: continue
+            if (end - last > REPAIR_GAP_MS) {
+                tripDao.updateTrip(trip.copy(endTime = last, syncedAt = null))
+                fixed++
+            }
+        }
+        if (fixed > 0) syncScheduler.syncNow()
+        return fixed
+    }
+
+    private companion object {
+        const val REPAIR_GAP_MS = 10 * 60_000L
     }
 
     override fun getActiveTrip(): Flow<Trip?> =

@@ -26,8 +26,9 @@ class TripDetailViewModel @Inject constructor(
             val metrics = computeMetrics(t.routePoints)
             val needsUpdate = t.distanceMeters == 0f ||
                     kotlin.math.abs(t.distanceMeters - metrics.distanceMeters) > 10f
-            if (needsUpdate && t.routePoints.size >= 2) {
-                tripRepository.stopTrip(tripId, metrics.distanceMeters, metrics.averageSpeedKmh)
+            // only finished trips, and only their metrics: viewing a trip must never end it
+            if (needsUpdate && t.isCompleted && t.routePoints.size >= 2) {
+                tripRepository.updateMetrics(tripId, metrics.distanceMeters, metrics.averageSpeedKmh)
                 _trip.value = t.copy(
                     distanceMeters = metrics.distanceMeters,
                     averageSpeedKmh = metrics.averageSpeedKmh

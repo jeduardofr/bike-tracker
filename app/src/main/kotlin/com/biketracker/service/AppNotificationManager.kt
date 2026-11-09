@@ -75,11 +75,20 @@ class AppNotificationManager @Inject constructor(
         manager.notify(NOTIF_ID_PACKING, builder.build())
     }
 
-    fun showWorkCountdownCompleteNotification() {
+    fun showWorkCountdownCompleteNotification(arrivalTime: Long) {
+        val since = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(arrivalTime))
+        val hours = (System.currentTimeMillis() - arrivalTime) / 3_600_000.0
+        val openApp = PendingIntent.getActivity(
+            context, 0, Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = NotificationCompat.Builder(context, CHANNEL_WORK_TIMER)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Time to head home!")
-            .setContentText("You've been at work for 8 hours.")
+            .setContentText("At the office since $since (%.1f h).".format(hours))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(openApp)
             .setAutoCancel(true)
             .build()
         manager.notify(NOTIF_ID_WORK_DONE, notification)
