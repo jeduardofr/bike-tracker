@@ -40,6 +40,17 @@ fun HomeScreen(
         rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
     } else null
 
+    // cycling detection, for starting rides automatically (HeadingOut): asked once
+    val activityPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        rememberPermissionState(Manifest.permission.ACTIVITY_RECOGNITION)
+    } else null
+    LaunchedEffect(activityPermission?.status?.isGranted) {
+        when {
+            activityPermission == null || activityPermission.status.isGranted -> viewModel.registerHeadingOut()
+            !activityPermission.status.shouldShowRationale -> activityPermission.launchPermissionRequest()
+        }
+    }
+
     var pendingDirection by remember { mutableStateOf<TripDirection?>(null) }
     var showStopDialog by remember { mutableStateOf(false) }
 

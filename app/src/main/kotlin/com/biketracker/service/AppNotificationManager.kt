@@ -44,19 +44,29 @@ class AppNotificationManager @Inject constructor(
         channels.forEach { manager.createNotificationChannel(it) }
     }
 
-    fun buildTrackingNotification(distanceMeters: Float, speedKmh: Float): Notification {
+    fun buildTrackingNotification(distanceMeters: Float, speedKmh: Float, auto: Boolean = false): Notification {
         val openAppIntent = PendingIntent.getActivity(
             context, 0,
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Builder(context, CHANNEL_TRACKING)
+        val builder = NotificationCompat.Builder(context, CHANNEL_TRACKING)
             .setSmallIcon(android.R.drawable.ic_menu_directions)
-            .setContentTitle("Tracking route…")
+            .setContentTitle(if (auto) "Tracking route… (started automatically)" else "Tracking route…")
             .setContentText("%.1f km · %.1f km/h".format(distanceMeters / 1000f, speedKmh))
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(openAppIntent)
-            .build()
+        if (auto) {
+            // a wrong guess (cycling somewhere else right after leaving): throw the trip away
+            val discard = PendingIntent.getService(
+                context, 3,
+                Intent(context, TrackingService::class.java).setAction(TrackingService.ACTION_DISCARD),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(android.R.drawable.ic_menu_delete, "Discard", discard)
+        }
+        return builder.build()
     }
 
     fun showPackingChecklistNotification(items: List<String> = emptyList()) {
@@ -94,22 +104,5 @@ class AppNotificationManager @Inject constructor(
         manager.notify(NOTIF_ID_WORK_DONE, notification)
     }
 
-    fun showStartHomeTripNotification() {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = "ACTION_START_HOME_TRIP"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notification = NotificationCompat.Builder(context, CHANNEL_GEOFENCE)
-            .setSmallIcon(android.R.drawable.ic_menu_directions)
-            .setContentTitle("Back home?")
-            .setContentText("Tap to start tracking your ride home.")
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
-        manager.notify(NOTIF_ID_START_HOME, notification)
-    }
+    fun cancelHeadingOut() = manager.cancel(NOTIF_ID_START_HOME)
 }

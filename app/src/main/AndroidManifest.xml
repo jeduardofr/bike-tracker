@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- the leave-work reminder (LeaveReminder): granted at install on 13+, user-granted below -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- heading-out prompt (HeadingOut): cycling detection -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
 
     <application
@@ -65,6 +68,10 @@
 
         <receiver
             android:name=".service.LeaveReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.ActivityTransitionReceiver"
             android:exported="false" />
 
     </application>

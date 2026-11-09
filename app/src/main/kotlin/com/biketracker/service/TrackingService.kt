@@ -34,6 +34,7 @@ class TrackingService : Service() {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
     private var stopping = false
+    private var autoStarted = false
     private var currentTripId: Long = -1
     private var tripStartTime: Long = 0L
     private val collectedPoints = mutableListOf<RoutePoint>()
@@ -45,6 +46,8 @@ class TrackingService : Service() {
     companion object {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
+        const val ACTION_DISCARD = "ACTION_DISCARD"
+        const val EXTRA_AUTO = "EXTRA_AUTO"
         const val EXTRA_TRIP_ID = "EXTRA_TRIP_ID"
         const val EXTRA_DIRECTION = "EXTRA_DIRECTION"
         private const val TAG = "TrackingService"
@@ -87,7 +90,7 @@ class TrackingService : Service() {
                         points = collectedPoints.toList()
                     )
                 )
-                val notification = appNotificationManager.buildTrackingNotification(distanceMeters, speedKmh)
+                val notification = appNotificationManager.buildTrackingNotification(distanceMeters, speedKmh, autoStarted)
                 startForeground(AppNotificationManager.NOTIF_ID_TRACKING, notification)
 
                 checkAutoStop()
@@ -99,18 +102,22 @@ class TrackingService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 stopping = false
+                autoStarted = intent.getBooleanExtra(EXTRA_AUTO, false)
                 currentTripId = intent.getLongExtra(EXTRA_TRIP_ID, -1L)
                 tripStartTime = System.currentTimeMillis()
                 collectedPoints.clear()
                 val directionName = intent.getStringExtra(EXTRA_DIRECTION)
                 Log.d(TAG, "ACTION_START tripId=$currentTripId direction=$directionName")
                 loadDestination(directionName)
-                val notification = appNotificationManager.buildTrackingNotification(0f, 0f)
+                val notification = appNotificationManager.buildTrackingNotification(0f, 0f, autoStarted)
                 startForeground(AppNotificationManager.NOTIF_ID_TRACKING, notification)
                 requestLocationUpdates()
             }
             ACTION_STOP -> {
                 stopTracking()
+            }
+            ACTION_DISCARD -> {
+                stopTracking(discard = true)
             }
         }
         return START_STICKY
@@ -163,7 +170,7 @@ class TrackingService : Service() {
         }
     }
 
-    private fun stopTracking() {
+    private fun stopTracking(discard: Boolean = false) {
         if (stopping) return // auto-stop fires on every fix inside the radius until updates stop
         stopping = true
         fusedLocationClient.removeLocationUpdates(locationCallback)
@@ -173,7 +180,9 @@ class TrackingService : Service() {
             // after the queued point writes; if the service was restarted it no longer knows the
             // trip, so close whichever one is still open
             val id = if (tripId != -1L) tripId else tripRepository.getActiveTrip().firstOrNull()?.id
-            if (id != null) stopTripUseCase(id)
+            if (id != null) {
+                if (discard) tripRepository.deleteTrip(id) else stopTripUseCase(id)
+            }
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

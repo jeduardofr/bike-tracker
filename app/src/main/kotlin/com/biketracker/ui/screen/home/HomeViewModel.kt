@@ -29,7 +29,8 @@ class HomeViewModel @Inject constructor(
     private val startTripUseCase: StartTripUseCase,
     private val trackingStateHolder: TrackingStateHolder,
     private val getDailyStats: GetDailyStatsUseCase,
-    private val tripRepository: TripRepository
+    private val tripRepository: TripRepository,
+    private val headingOut: com.biketracker.service.HeadingOut
 ) : ViewModel() {
 
     val trackingState = trackingStateHolder.state.stateIn(
@@ -66,6 +67,11 @@ class HomeViewModel @Inject constructor(
                     Log.e(TAG, "startTripUseCase failed", e)
                 }
         }
+    }
+
+    /** After the activity-recognition permission is granted: start watching for rides. */
+    fun registerHeadingOut() {
+        viewModelScope.launch { headingOut.register() }
     }
 
     fun stopTrip() {
