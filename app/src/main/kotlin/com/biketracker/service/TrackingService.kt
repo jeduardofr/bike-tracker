@@ -34,7 +34,11 @@ class TrackingService : Service() {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
     private var stopping = false
-    private var autoStarted = false
+    // the main thread: location callbacks run there, so buffer hand-overs can't interleave with them
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val handler = android.os.Handler(Looper.getMainLooper())
+    private val watchTimeout = Runnable { if (currentTripId == -1L) stopWatching() }
+    @Inject lateinit var startTripUseCase: com.biketracker.domain.usecase.StartTripUseCase
     private var currentTripId: Long = -1
     private var tripStartTime: Long = 0L
     private val collectedPoints = mutableListOf<RoutePoint>()
@@ -46,8 +50,13 @@ class TrackingService : Service() {
     companion object {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
-        const val ACTION_DISCARD = "ACTION_DISCARD"
-        const val EXTRA_AUTO = "EXTRA_AUTO"
+        /** HeadingOut: record GPS into memory only, in case this turns into a ride (EXTRA_DIRECTION) */
+        const val ACTION_WATCH = "ACTION_WATCH"
+        /** "Start ride": the watch becomes a trip, keeping what it recorded */
+        const val ACTION_CONFIRM = "ACTION_CONFIRM"
+        /** "Not now", or nothing came of it: drop the watch and its points */
+        const val ACTION_DISMISS = "ACTION_DISMISS"
+        const val WATCH_MS = 15 * 60_000L
         const val EXTRA_TRIP_ID = "EXTRA_TRIP_ID"
         const val EXTRA_DIRECTION = "EXTRA_DIRECTION"
         private const val TAG = "TrackingService"
@@ -71,12 +80,14 @@ class TrackingService : Service() {
                         accuracy = location.accuracy
                     )
                     collectedPoints.add(point)
-                    writeScope.launch {
+                    if (currentTripId != -1L) writeScope.launch {
                         if (currentTripId != -1L) {
                             tripRepository.addRoutePoint(currentTripId, point)
                         }
                     }
                 }
+
+                if (currentTripId == -1L) return // watching: buffer only, until it's confirmed
 
                 val distanceMeters = computeDistance(collectedPoints)
                 val speedKmh = if (collectedPoints.isNotEmpty()) collectedPoints.last().speedMps * 3.6f else 0f
@@ -90,7 +101,7 @@ class TrackingService : Service() {
                         points = collectedPoints.toList()
                     )
                 )
-                val notification = appNotificationManager.buildTrackingNotification(distanceMeters, speedKmh, autoStarted)
+                val notification = appNotificationManager.buildTrackingNotification(distanceMeters, speedKmh)
                 startForeground(AppNotificationManager.NOTIF_ID_TRACKING, notification)
 
                 checkAutoStop()
@@ -101,26 +112,73 @@ class TrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                // a trip started from the app; if a watch is running, it keeps what it recorded
+                val id = intent.getLongExtra(EXTRA_TRIP_ID, -1L)
+                Log.d(TAG, "ACTION_START tripId=$id direction=${intent.getStringExtra(EXTRA_DIRECTION)}")
+                becomeTrip(id, intent.getStringExtra(EXTRA_DIRECTION))
+            }
+            ACTION_WATCH -> {
+                if (currentTripId != -1L || trackingStateHolder.watching != null) return START_NOT_STICKY
+                val direction = intent.getStringExtra(EXTRA_DIRECTION)?.let { runCatching { TripDirection.valueOf(it) }.getOrNull() }
+                    ?: return START_NOT_STICKY
                 stopping = false
-                autoStarted = intent.getBooleanExtra(EXTRA_AUTO, false)
-                currentTripId = intent.getLongExtra(EXTRA_TRIP_ID, -1L)
-                tripStartTime = System.currentTimeMillis()
                 collectedPoints.clear()
-                val directionName = intent.getStringExtra(EXTRA_DIRECTION)
-                Log.d(TAG, "ACTION_START tripId=$currentTripId direction=$directionName")
-                loadDestination(directionName)
-                val notification = appNotificationManager.buildTrackingNotification(0f, 0f, autoStarted)
-                startForeground(AppNotificationManager.NOTIF_ID_TRACKING, notification)
+                trackingStateHolder.watching = direction
+                trackingStateHolder.prompted = false
+                startForeground(AppNotificationManager.NOTIF_ID_TRACKING, appNotificationManager.buildWatchingNotification(direction))
                 requestLocationUpdates()
+                handler.removeCallbacks(watchTimeout)
+                handler.postDelayed(watchTimeout, WATCH_MS)
+            }
+            ACTION_CONFIRM -> {
+                val direction = trackingStateHolder.watching
+                    ?: intent.getStringExtra(EXTRA_DIRECTION)?.let { runCatching { TripDirection.valueOf(it) }.getOrNull() }
+                appNotificationManager.cancelHeadingOut()
+                if (currentTripId != -1L || direction == null) return START_NOT_STICKY
+                mainScope.launch {
+                    val id = withContext(Dispatchers.IO) { startTripUseCase(direction).getOrNull() } ?: return@launch
+                    // startTrip wasn't told the service is already running: same path as the app's
+                    becomeTrip(id, direction.name)
+                }
+            }
+            ACTION_DISMISS -> {
+                appNotificationManager.cancelHeadingOut()
+                if (currentTripId == -1L) stopWatching()
             }
             ACTION_STOP -> {
                 stopTracking()
             }
-            ACTION_DISCARD -> {
-                stopTracking(discard = true)
-            }
         }
         return START_STICKY
+    }
+
+    /** Starts tracking [tripId]; points a watch already buffered go into it first. Main thread. */
+    private fun becomeTrip(tripId: Long, directionName: String?) {
+        val wasWatching = trackingStateHolder.watching != null
+        trackingStateHolder.watching = null
+        handler.removeCallbacks(watchTimeout)
+        stopping = false
+        currentTripId = tripId
+        val buffered = if (wasWatching) collectedPoints.toList() else emptyList()
+        if (!wasWatching) collectedPoints.clear()
+        tripStartTime = buffered.firstOrNull()?.timestamp ?: System.currentTimeMillis()
+        // queued ahead of the next fix's write, so the trip's points stay in order
+        if (buffered.isNotEmpty()) writeScope.launch { tripRepository.adoptPoints(tripId, buffered) }
+        loadDestination(directionName)
+        startForeground(AppNotificationManager.NOTIF_ID_TRACKING, appNotificationManager.buildTrackingNotification(computeDistance(collectedPoints), 0f))
+        if (!wasWatching) requestLocationUpdates()
+    }
+
+    /** The watch ends with no trip: nothing was written, so nothing to undo. */
+    private fun stopWatching() {
+        Log.d(TAG, "watch ended without a ride (${collectedPoints.size} points dropped)")
+        trackingStateHolder.watching = null
+        handler.removeCallbacks(watchTimeout)
+        appNotificationManager.cancelHeadingOut()
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        collectedPoints.clear()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun loadDestination(directionName: String?) {
@@ -170,7 +228,8 @@ class TrackingService : Service() {
         }
     }
 
-    private fun stopTracking(discard: Boolean = false) {
+    private fun stopTracking() {
+        if (currentTripId == -1L && trackingStateHolder.watching != null) return stopWatching()
         if (stopping) return // auto-stop fires on every fix inside the radius until updates stop
         stopping = true
         fusedLocationClient.removeLocationUpdates(locationCallback)
@@ -180,9 +239,7 @@ class TrackingService : Service() {
             // after the queued point writes; if the service was restarted it no longer knows the
             // trip, so close whichever one is still open
             val id = if (tripId != -1L) tripId else tripRepository.getActiveTrip().firstOrNull()?.id
-            if (id != null) {
-                if (discard) tripRepository.deleteTrip(id) else stopTripUseCase(id)
-            }
+            if (id != null) stopTripUseCase(id)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

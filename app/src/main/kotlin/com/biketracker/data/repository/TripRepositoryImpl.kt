@@ -70,6 +70,14 @@ class TripRepositoryImpl @Inject constructor(
         return fixed
     }
 
+    override suspend fun adoptPoints(tripId: Long, points: List<RoutePoint>) {
+        if (points.isEmpty()) return
+        routePointDao.insertPoints(points.map { it.toEntity(tripId) })
+        val trip = tripDao.getTripById(tripId) ?: return
+        val first = points.minOf { it.timestamp }
+        if (first < trip.startTime) tripDao.updateTrip(trip.copy(startTime = first))
+    }
+
     private companion object {
         const val REPAIR_GAP_MS = 10 * 60_000L
     }

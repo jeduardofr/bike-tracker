@@ -26,4 +26,9 @@ class TrackingStateHolder @Inject constructor() {
     fun emit(state: TrackingState) {
         _state.value = state
     }
+
+    /** The direction HeadingOut is watching for (GPS buffering, no trip yet), or null. */
+    @Volatile var watching: com.biketracker.data.local.database.entity.TripDirection? = null
+    /** Whether this watch already asked "Heading home?" */
+    @Volatile var prompted: Boolean = false
 }

@@ -23,8 +23,8 @@ android {
         applicationId = "com.biketracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
         buildConfigField("String", "TURSO_DATABASE_URL", "\"${localProperties.getProperty("TURSO_DATABASE_URL", "")}\"")
         buildConfigField("String", "TURSO_AUTH_TOKEN", "\"${localProperties.getProperty("TURSO_AUTH_TOKEN", "")}\"")
