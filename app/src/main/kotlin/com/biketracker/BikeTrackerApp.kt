@@ -28,8 +28,9 @@ class BikeTrackerApp : Application(), Configuration.Provider {
     @Inject
     lateinit var leaveReminder: com.biketracker.service.LeaveReminder
 
+
     @Inject
-    lateinit var headingOut: com.biketracker.service.HeadingOut
+    lateinit var morningPrompt: com.biketracker.service.MorningPrompt
 
     override fun onCreate() {
         super.onCreate()
@@ -46,7 +47,7 @@ class BikeTrackerApp : Application(), Configuration.Provider {
             // them is cheap (inside the office, its ENTER just confirms today's earliest arrival)
             geofencingManager.registerGeofences()
             leaveReminder.restore()
-            headingOut.register()
+            morningPrompt.schedule()
         }
     }
 

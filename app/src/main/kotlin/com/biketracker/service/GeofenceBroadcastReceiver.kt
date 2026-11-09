@@ -20,14 +20,14 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
     @Inject lateinit var geofencingManager: GeofencingManager
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var leaveReminder: LeaveReminder
-    @Inject lateinit var headingOut: HeadingOut
+    @Inject lateinit var morningPrompt: MorningPrompt
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             goAsync {
                 geofencingManager.registerGeofences()
                 leaveReminder.restore()
-                headingOut.register()
+                morningPrompt.schedule()
             }
             return
         }
@@ -43,16 +43,10 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                 transition == Geofence.GEOFENCE_TRANSITION_EXIT && fenceIds.contains(GeofencingManager.GEOFENCE_ID_HOME) -> {
                     val checklist = settingsRepository.packingChecklist.firstOrNull() ?: emptyList()
                     appNotificationManager.showPackingChecklistNotification(checklist)
-                    headingOut.leftFence(HeadingOut.PLACE_HOME, System.currentTimeMillis())
                 }
                 transition == Geofence.GEOFENCE_TRANSITION_ENTER && fenceIds.contains(GeofencingManager.GEOFENCE_ID_OFFICE) -> {
                     // a fallback: the ride in usually sets the arrival first (StopTripUseCase)
                     leaveReminder.arrived(System.currentTimeMillis(), "geofence")
-                }
-                transition == Geofence.GEOFENCE_TRANSITION_EXIT && fenceIds.contains(GeofencingManager.GEOFENCE_ID_OFFICE) -> {
-                    // no longer cancels the reminder: GPS jitter at the fence edge and lunch
-                    // breaks exit too; starting the ride home is what cancels it
-                    headingOut.leftFence(HeadingOut.PLACE_OFFICE, System.currentTimeMillis())
                 }
             }
         }

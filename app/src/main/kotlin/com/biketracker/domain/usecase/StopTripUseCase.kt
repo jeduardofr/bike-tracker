@@ -20,15 +20,20 @@ class StopTripUseCase @Inject constructor(
         val metrics = computeMetrics(trip.routePoints)
         tripRepository.stopTrip(tripId, metrics.distanceMeters, metrics.averageSpeedKmh)
 
-        // a ride in that ends at the office is the most reliable arrival time there is
+        // a ride in that ends at the office (where the bike is parked) is the most reliable arrival
+        // time there is, plus the walk from the bike to the building
         val last = trip.routePoints.lastOrNull()
         val office = settingsRepository.officeLocation.firstOrNull()
         if (trip.direction == TripDirection.HOME_TO_OFFICE && last != null && office != null) {
             val radius = settingsRepository.geofenceRadiusMeters.firstOrNull() ?: 150f
             val d = FloatArray(1)
             Location.distanceBetween(last.latitude, last.longitude, office.latitude, office.longitude, d)
-            if (d[0] <= maxOf(radius * 2, 300f)) leaveReminder.arrived(last.timestamp, "ride")
+            if (d[0] <= maxOf(radius * 2, 300f)) leaveReminder.arrived(last.timestamp + WALK_TO_OFFICE_MS, "ride")
         }
         return Result.success(Unit)
+    }
+
+    private companion object {
+        const val WALK_TO_OFFICE_MS = 3 * 60_000L
     }
 }

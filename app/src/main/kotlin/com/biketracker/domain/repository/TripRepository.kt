@@ -14,8 +14,6 @@ interface TripRepository {
     suspend fun updateMetrics(tripId: Long, distanceMeters: Float, averageSpeedKmh: Float)
     /** Finished trips whose end is long after their last GPS point get that point as their end. */
     suspend fun repairEndTimes(): Int
-    /** Points recorded before the trip existed (HeadingOut's watch): stored, and the trip starts at the first. */
-    suspend fun adoptPoints(tripId: Long, points: List<RoutePoint>)
     fun getActiveTrip(): Flow<Trip?>
     fun getTripsInRange(from: Long, to: Long): Flow<List<Trip>>
     suspend fun getTripWithRoute(tripId: Long): Trip?

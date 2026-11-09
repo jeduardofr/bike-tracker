@@ -19,7 +19,7 @@ class StartTripUseCase @Inject constructor(
         if (activeTrip != null) stopTrip(activeTrip.id)
         // heading home: today's "time to leave" reminder is no longer needed
         if (direction == TripDirection.OFFICE_TO_HOME) leaveReminder.departed(System.currentTimeMillis())
-        notifications.cancelHeadingOut() // started by hand: the prompt is moot
+        notifications.cancelRidePrompts() // started by hand: the prompt is moot
         return Result.success(tripRepository.startTrip(direction))
     }
 }

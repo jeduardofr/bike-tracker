@@ -61,42 +61,28 @@ class AppNotificationManager @Inject constructor(
             .build()
     }
 
-    private fun serviceIntent(action: String, code: Int, direction: TripDirection? = null) = PendingIntent.getService(
-        context, code,
-        Intent(context, TrackingService::class.java).setAction(action)
-            .apply { direction?.let { putExtra(TrackingService.EXTRA_DIRECTION, it.name) } },
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
-    /** The quiet ongoing notification while HeadingOut buffers GPS after leaving a place. */
-    fun buildWatchingNotification(direction: TripDirection): Notification {
-        val from = if (direction == TripDirection.OFFICE_TO_HOME) "the office" else "home"
-        return NotificationCompat.Builder(context, CHANNEL_TRACKING)
-            .setSmallIcon(android.R.drawable.ic_menu_directions)
-            .setContentTitle("Left $from")
-            .setContentText("Holding your route in case you're riding; nothing is saved unless you start the ride.")
-            .setOngoing(true)
-            .setContentIntent(serviceIntent(TrackingService.ACTION_CONFIRM, 4, direction))
-            .addAction(android.R.drawable.ic_media_play, "Start ride", serviceIntent(TrackingService.ACTION_CONFIRM, 4, direction))
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Not now", serviceIntent(TrackingService.ACTION_DISMISS, 5))
-            .build()
+    private fun serviceIntent(action: String, code: Int, direction: TripDirection? = null): PendingIntent {
+        val intent = Intent(context, TrackingService::class.java).setAction(action)
+            .apply { direction?.let { putExtra(TrackingService.EXTRA_DIRECTION, it.name) } }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // "Start ride" may have to bring the service up from nothing (the morning prompt)
+        return if (action == TrackingService.ACTION_CONFIRM) PendingIntent.getForegroundService(context, code, intent, flags)
+        else PendingIntent.getService(context, code, intent, flags)
     }
 
-    /** "Heading home?" once cycling is detected: one tap keeps everything since leaving. */
-    fun showHeadingOutNotification(direction: TripDirection, leftAt: Long) {
-        val home = direction == TripDirection.OFFICE_TO_HOME
-        val since = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(leftAt))
-        val start = serviceIntent(TrackingService.ACTION_CONFIRM, 6, direction)
+    /** "Heading to the office?" at 8:00 (MorningPrompt): Start ride starts the trip, nothing else does. */
+    fun showMorningPrompt() {
+        val start = serviceIntent(TrackingService.ACTION_CONFIRM, 6, TripDirection.HOME_TO_OFFICE)
         val notification = NotificationCompat.Builder(context, CHANNEL_GEOFENCE)
             .setSmallIcon(android.R.drawable.ic_menu_directions)
-            .setContentTitle(if (home) "Heading home?" else "Heading to the office?")
-            .setContentText("Route held since $since. Start ride keeps all of it.")
+            .setContentTitle("Heading to the office?")
+            .setContentText("Start ride to track it.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(start)
             .addAction(android.R.drawable.ic_media_play, "Start ride", start)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Not now", serviceIntent(TrackingService.ACTION_DISMISS, 7))
             .setAutoCancel(true)
-            .setTimeoutAfter(TrackingService.WATCH_MS)
+            .setTimeoutAfter(2 * 3_600_000L) // stale by mid-morning
             .build()
         manager.notify(NOTIF_ID_START_HOME, notification)
     }
@@ -120,21 +106,24 @@ class AppNotificationManager @Inject constructor(
     fun showWorkCountdownCompleteNotification(arrivalTime: Long) {
         val since = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(arrivalTime))
         val hours = (System.currentTimeMillis() - arrivalTime) / 3_600_000.0
-        val openApp = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val start = serviceIntent(TrackingService.ACTION_CONFIRM, 8, TripDirection.OFFICE_TO_HOME)
         val notification = NotificationCompat.Builder(context, CHANNEL_WORK_TIMER)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Time to head home!")
-            .setContentText("At the office since $since (%.1f h).".format(hours))
+            .setContentText("At the office since $since (%.1f h). Start ride when you're on the bike.".format(hours))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(openApp)
+            .setContentIntent(start)
+            .addAction(android.R.drawable.ic_media_play, "Start ride", start)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Not now", serviceIntent(TrackingService.ACTION_DISMISS, 9))
             .setAutoCancel(true)
             .build()
         manager.notify(NOTIF_ID_WORK_DONE, notification)
     }
 
-    fun cancelHeadingOut() = manager.cancel(NOTIF_ID_START_HOME)
+    /** Both ride prompts (8:00 and leave-work), once a ride starts or one is dismissed. */
+    fun cancelRidePrompts() {
+        manager.cancel(NOTIF_ID_START_HOME)
+        manager.cancel(NOTIF_ID_WORK_DONE)
+    }
 }
